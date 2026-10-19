@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Undivided Leaders</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#ECEFE9;--surface:#F9FAF6;--sunk:#E2E6DF;--ink:#1B2320;--muted:#59645F;--rule:#C9D0C8;--brass:#9A6A14;--brass-soft:#E9D9B6;--verd:#1E5C57;--verd-soft:#D4E6E2;--clay:#A9481F;
+  --display:"Gloock",Georgia,serif;--body:"Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0F1514;--surface:#172020;--sunk:#1E2928;--ink:#E6ECE8;--muted:#9BA8A2;--rule:#2E3B39;--brass:#D9A64F;--brass-soft:#3A2F1A;--verd:#6CBDB2;--verd-soft:#173230;--clay:#E58058;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5}
+.wrap{max-width:960px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-left,0px)) 60px max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;line-height:1.15}
+h1{font-size:40px} h2{font-size:26px} h3{font-size:19px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:22px;display:flex;flex-direction:column;gap:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+input,select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:10px 12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted);flex:1;min-width:160px}
+.btn{font:inherit;font-weight:700;background:var(--ink);color:var(--bg);border:0;border-radius:4px;padding:11px 18px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.btn:disabled{opacity:.4}
+.note{font-size:14px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:10px 8px;border-bottom:1px solid var(--rule);text-align:left}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:400}
+.code{font-family:var(--mono);font-size:18px;letter-spacing:.12em;color:var(--brass)}
+.scroll{overflow-x:auto}
+.trio{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.trio div{background:var(--bg);border:1px solid var(--rule);border-radius:5px;padding:12px 14px}
+.trio b{display:block;font-family:var(--mono);font-size:28px}
+.trio span{font-size:13px;color:var(--muted)}
+.bar{display:grid;grid-template-columns:minmax(110px,200px) minmax(0,1fr) 44px;gap:10px;align-items:center;font-size:14.5px}
+.bar .tr{height:10px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.bar .tr i{display:block;height:100%;background:var(--verd)}
+.bar.low .tr i{background:var(--clay)}
+.bar em{font-style:normal;font-family:var(--mono);text-align:right}
+.dist{display:flex;flex-wrap:wrap;gap:6px}
+.dist span{font-family:var(--mono);font-size:12.5px;background:var(--verd-soft);color:var(--verd);padding:3px 8px;border-radius:3px}
+.lock{background:var(--brass-soft);border-radius:5px;padding:14px 16px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div><div class="eyebrow">Undivided · for teachers, pastors and team leads</div><h1>Leader dashboard</h1></div>
+
+  <div class="card" id="signin" hidden>
+    <h2>Sign in</h2>
+    <p>Enter your email and we’ll send you a sign-in link. Players never sign in; they join with your group code.</p>
+    <div class="row"><label for="em">Email<input id="em" type="email" autocomplete="email" placeholder="you@school.org"></label><button class="btn" id="send">Send sign-in link</button></div>
+    <p class="note" id="smsg"></p>
+  </div>
+
+  <div id="app" hidden style="display:flex;flex-direction:column;gap:20px">
+    <div class="row" style="justify-content:space-between"><p class="note" id="who"></p><button class="btn ghost" id="out">Sign out</button></div>
+
+    <div class="card">
+      <h2>Create a group</h2>
+      <div class="row">
+        <label for="gn">Group name<input id="gn" maxlength="80" placeholder="e.g. Grade 10 Blue, Men’s Fellowship, Finance Team"></label>
+        <label for="gk">Type<select id="gk"><option value="school">School</option><option value="church">Church</option><option value="workplace">Workplace</option><option value="other">Other</option></select></label>
+        <label for="gl">Lens<select id="gl"><option value="">Player chooses</option><option value="f">Faith</option><option value="c">Civic</option></select></label>
+        <label for="gs">Setting<select id="gs"><option value="">Player chooses</option><option value="a">Life &amp; Work</option><option value="y">School (12–18)</option></select></label>
+      </div>
+      <div class="row"><button class="btn" id="mk">Create group</button><span class="note" id="mkmsg"></span></div>
+    </div>
+
+    <div class="card">
+      <h2>Your groups</h2>
+      <div class="scroll"><table><thead><tr><th>Group</th><th>Code</th><th>Players</th><th></th></tr></thead><tbody id="list"><tr><td colspan="4" class="note">Loading…</td></tr></tbody></table></div>
+    </div>
+
+    <div class="card" id="sum" hidden></div>
+  </div>
+
+  <p class="note">You see group totals only, and only once 5 or more people have played. Individual results are never shown to leaders. Undivided is a reflection tool, not a validated test: please don’t use it for hiring, grading, discipline or appointments.</p>
+</div>
+
+<script>
+"use strict";
+const CFG = window.UNDIVIDED_CONFIG || {};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const EL = {hon:"Honesty",chas:"Faithfulness & Boundaries",fair:"Fairness & Equity",char:"Charity / Compassion",fam:"Family",pow:"Use of Power",cont:"Contentment",mercy:"Mercy",trans:"Transparency",opp:"Second Chances",just:"Justice & Stewardship"};
+const MIRRORS = {seen_unseen:"Seen · Unseen",say_do:"Say · Do",others_self:"Others · Self",promise_path:"Promise · Path"};
+const SCENES = {change:"Gate 1 · Wrong change (watched)",error:"Gate 1 · The hidden mistake",creditSeen:"Gate 1 · Credit for Tolu (watched)",garden:"Gate 2 · The Garden",layoff:"Gate 3 · Who goes / the grading",stream:"Gate 3 · The stream / the clean-up",bonus:"Gate 4 · The bonus / the savings",checkout:"Gate 5 · The unscanned item (alone)",panel:"Gate 5 · The hiring panel / quiz team",creditAlone:"Gate 6 · Credit for Tolu (alone)",offer:"Gate 6 · The offer",chat:"Gate 7 · The group chat",return:"Gate 7 · The second chance"};
+
+if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !window.supabase){
+  document.querySelector(".wrap").insertAdjacentHTML("beforeend", `<div class="card"><b>Not connected yet.</b><p>Fill in config.js with your Supabase URL and public key.</p></div>`);
+} else {
+  const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey);
+  const show = async (session) => {
+    $("#signin").hidden = !!session; $("#app").hidden = !session;
+    if(session){ $("#who").textContent = "Signed in as " + session.user.email; loadList(); }
+  };
+  sb.auth.getSession().then(({data}) => show(data.session));
+  sb.auth.onAuthStateChange((_e, session) => show(session));
+
+  $("#send").onclick = async () => {
+    const email = $("#em").value.trim(); if(!email) return;
+    $("#send").disabled = true; $("#smsg").textContent = "Sending…";
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split("#")[0] } });
+    $("#smsg").textContent = error ? ("Couldn’t send the link: " + error.message) : "Check your email for the sign-in link.";
+    $("#send").disabled = false;
+  };
+  $("#out").onclick = () => sb.auth.signOut();
+
+  $("#mk").onclick = async () => {
+    const name = $("#gn").value.trim(); if(name.length < 2){ $("#mkmsg").textContent = "Give the group a name first."; return; }
+    $("#mk").disabled = true;
+    const { data, error } = await sb.rpc("ud_create_cohort", { p_name:name, p_kind:$("#gk").value, p_lens:$("#gl").value || null, p_setting:$("#gs").value || null });
+    $("#mk").disabled = false;
+    if(error){ $("#mkmsg").textContent = "Couldn’t create the group: " + error.message; return; }
+    $("#mkmsg").innerHTML = `Created. Players enter code <span class="code">${esc(data.code)}</span> on the game’s start screen.`;
+    $("#gn").value = ""; loadList();
+  };
+
+  async function loadList(){
+    const { data, error } = await sb.rpc("ud_my_cohorts");
+    if(error){ $("#list").innerHTML = `<tr><td colspan="4">Couldn’t load groups: ${esc(error.message)}</td></tr>`; return; }
+    if(!data.length){ $("#list").innerHTML = `<tr><td colspan="4" class="note">No groups yet. Create one above, then share its code.</td></tr>`; return; }
+    $("#list").innerHTML = data.map(c => `<tr><td>${esc(c.name)}<br><span class="note">${esc(c.kind)}${c.lens?" · "+(c.lens==="f"?"Faith":"Civic"):""}${c.setting?" · "+(c.setting==="y"?"School":"Life & Work"):""}</span></td>
+      <td class="code">${esc(c.code)}</td><td>${c.players}</td><td><button class="btn ghost" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Results</button></td></tr>`).join("");
+    document.querySelectorAll("#list button").forEach(b => b.onclick = () => loadSummary(b.dataset.id, b.dataset.name));
+  }
+
+  async function loadSummary(id, name){
+    const box = $("#sum"); box.hidden = false; box.innerHTML = `<p class="note">Loading ${esc(name)}…</p>`;
+    const { data:s, error } = await sb.rpc("ud_cohort_summary", { p_id:id });
+    if(error){ box.innerHTML = `<p>Couldn’t load results: ${esc(error.message)}</p>`; return; }
+    if(s.locked){ box.innerHTML = `<h2>${esc(name)}</h2><div class="lock"><b>${s.n} of ${s.min_group} players so far.</b> Results unlock at ${s.min_group}, so no one can be singled out.</div>`; return; }
+    const bars = (obj, labels) => Object.keys(labels).filter(k => obj[k] != null).map(k => `<div class="bar ${obj[k]<50?"low":""}"><span>${esc(labels[k])}</span><div class="tr"><i style="width:${obj[k]}%"></i></div><em>${obj[k]}</em></div>`).join("");
+    const c = s.coins || {flips:0, heads:0};
+    const pct = c.flips ? Math.round(c.heads / c.flips * 100) : null;
+    const scenes = Object.keys(SCENES).filter(k => s.scenes && s.scenes[k]).map(k => {
+      const d = s.scenes[k]; const tot = Object.values(d).reduce((a,b)=>a+b,0);
+      return `<tr><td>${esc(SCENES[k])}</td><td><div class="dist">${Object.keys(d).sort().map(o => `<span>${"ABCDE"[+o]||o}: ${Math.round(d[o]/tot*100)}%</span>`).join("")}</div></td></tr>`;
+    }).join("");
+    box.innerHTML = `<div class="eyebrow">${s.n} players</div><h2>${esc(name)}</h2>
+      <div class="trio"><div><span>Average IQ</span><b>${s.iq}</b></div><div><span>Choices</span><b>${s.choices}</b></div><div><span>Wholeness</span><b>${s.wholeness}</b></div><div><span>Discernment</span><b>${s.discernment}</b></div></div>
+      <h3>The four mirrors</h3><div style="display:flex;flex-direction:column;gap:8px">${bars(s.mirrors||{}, MIRRORS)}</div>
+      <h3>The eleven elements</h3><div style="display:flex;flex-direction:column;gap:8px">${bars(s.elements||{}, EL)}</div>
+      <h3>The Honest Coin</h3><p>${c.flips ? `The group reported ${c.heads} heads from ${c.flips} real flips (${pct}%). Honest flipping lands near 50%. The further above 50%, the more the group as a whole shaded the truth. No individual can be identified from this.` : "No real coin flips were reported."}</p>
+      <h3>Promises</h3><p>${s.promise_made ? `${s.promise_kept} of ${s.promise_made} players who promised Mara kept their word without a reminder.` : "No one in this group made the promise."}</p>
+      <h3>How the group chose, scene by scene</h3><p class="note">Letters match the order of options in the game. Use these for discussion, not judgment.</p>
+      <div class="scroll"><table><tbody>${scenes}</tbody></table></div>`;
+    box.scrollIntoView({behavior:"smooth"});
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Undivided: The Integrity Quest. An AI-guided game of character built on Job 31.">
+<script src="config.js"></script>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<title>Undivided</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a plumb line hangs down the left rail through seven gates; the play card sits beside it. Final screen tilts the line by your wholeness. */
+:root{
+  --bg:#ECEFE9; --surface:#F9FAF6; --sunk:#E2E6DF; --ink:#1B2320; --muted:#59645F; --rule:#C9D0C8;
+  --brass:#9A6A14; --brass-soft:#E9D9B6; --verd:#1E5C57; --verd-soft:#D4E6E2; --clay:#A9481F; --clay-soft:#F2DCCF;
+  --display:"Gloock", "Iowan Old Style", Georgia, serif;
+  --body:"Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1514; --surface:#172020; --sunk:#1E2928; --ink:#E6ECE8; --muted:#9BA8A2; --rule:#2E3B39;
+  --brass:#D9A64F; --brass-soft:#3A2F1A; --verd:#6CBDB2; --verd-soft:#173230; --clay:#E58058; --clay-soft:#3B2219; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1514; --surface:#172020; --sunk:#1E2928; --ink:#E6ECE8; --muted:#9BA8A2; --rule:#2E3B39;
+  --brass:#D9A64F; --brass-soft:#3A2F1A; --verd:#6CBDB2; --verd-soft:#173230; --clay:#E58058; --clay-soft:#3B2219; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--brass);outline-offset:2px}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);gap:40px;max-width:1120px;margin:0 auto;
+  padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:820px){.shell{grid-template-columns:minmax(0,1fr);gap:18px;padding-block:14px 48px}}
+
+/* Rail */
+.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 20px);align-self:start;display:flex;flex-direction:column;gap:22px}
+.brand{font-family:var(--display);font-size:30px;letter-spacing:.02em;line-height:1}
+.brand small{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.path{position:relative;padding-left:26px;display:flex;flex-direction:column;gap:14px}
+.path::before{content:"";position:absolute;left:8px;top:-8px;bottom:6px;width:1.5px;background:var(--brass)}
+.node{position:relative;font-size:14px;color:var(--muted);line-height:1.25}
+.node::before{content:"";position:absolute;left:-23px;top:3px;width:11px;height:11px;border-radius:50%;background:var(--bg);border:1.5px solid var(--brass)}
+.node.done::before{background:var(--brass)}
+.node.now{color:var(--ink);font-weight:700}
+.node.now::before{background:var(--brass);box-shadow:0 0 0 5px var(--brass-soft)}
+.node span{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:400}
+.purse{display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--rule);padding-top:12px;font-size:13px;color:var(--muted)}
+.purse b{font-family:var(--mono);font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
+.guidebox{font-size:14px;color:var(--muted);border-left:2px solid var(--verd);padding-left:12px}
+.guidebox b{color:var(--verd);display:block;font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+@media (max-width:820px){
+  .rail{position:static;flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 18px}
+  .brand{font-size:24px}
+  .path{flex-direction:row;padding-left:0;gap:6px;order:3;width:100%}
+  .path::before{left:0;right:0;top:5px;bottom:auto;width:auto;height:1.5px}
+  .node{font-size:0;width:12px;height:12px}
+  .node span{display:none}
+  .node::before{left:0;top:0}
+  .purse{border:0;padding:0;gap:8px;margin-left:auto}
+  .guidebox{display:none}
+}
+
+/* Main card */
+main{min-width:0}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:clamp(20px,4vw,40px);display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
+h1,h2,h3{font-family:var(--display);font-weight:400;text-wrap:balance;margin:0;line-height:1.12}
+h1{font-size:clamp(44px,8vw,84px);letter-spacing:.01em}
+h2{font-size:clamp(28px,4.2vw,40px)}
+h3{font-size:22px}
+p{margin:0;max-width:66ch}
+.lede{font-size:19px;color:var(--muted)}
+.scene{font-size:19px;line-height:1.6}
+.verse{border-left:2px solid var(--brass);padding:2px 0 2px 14px;font-style:italic;color:var(--muted);max-width:60ch}
+.verse cite{display:block;font-style:normal;font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;color:var(--brass);margin-top:4px}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{display:grid;grid-template-columns:30px minmax(0,1fr);gap:12px;align-items:start;text-align:left;background:var(--bg);border:1px solid var(--rule);border-radius:5px;padding:14px 16px;cursor:pointer;transition:border-color .15s,background .15s}
+.opt:hover{border-color:var(--brass)}
+.opt .k{font-family:var(--mono);font-size:13px;color:var(--brass);border:1px solid var(--brass);border-radius:50%;width:26px;height:26px;display:grid;place-items:center}
+.opt.picked{border-color:var(--verd);background:var(--verd-soft)}
+.opt:disabled{cursor:default}
+.opt:disabled:not(.picked){opacity:.55}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{background:var(--ink);color:var(--bg);border:0;border-radius:4px;padding:12px 20px;font-weight:700;cursor:pointer;letter-spacing:.01em}
+.btn:disabled{opacity:.4;cursor:default}
+a.btn{text-decoration:none;display:inline-block}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.btn.brass{background:var(--brass);color:var(--surface)}
+.btn.small{padding:8px 14px;font-size:14px}
+.conseq{background:var(--sunk);border-radius:5px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:3px;background:var(--verd-soft);color:var(--verd)}
+.chip.neg{background:var(--clay-soft);color:var(--clay)}
+.chip.gold{background:var(--brass-soft);color:var(--brass)}
+.ask{border:1px dashed var(--verd);border-radius:5px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;color:var(--ink)}
+.ask b{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--verd)}
+textarea{width:100%;min-height:72px;background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;resize:vertical}
+input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;width:100%}
+label.field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.seg button{text-align:left;background:var(--bg);border:1px solid var(--rule);border-radius:5px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.seg button b{font-size:16px}
+.seg button small{color:var(--muted);font-size:13px;line-height:1.35}
+.seg button[aria-pressed=true]{border-color:var(--brass);background:var(--brass-soft)}
+.setgroup{display:flex;flex-direction:column;gap:8px}
+.setgroup > span{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--brass)}
+.scale{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.big{font-family:var(--mono);font-size:44px;font-variant-numeric:tabular-nums;line-height:1}
+.evid{display:flex;flex-direction:column;gap:8px}
+.ev{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;padding:12px 14px;border-radius:5px;background:var(--bg);border:1px solid var(--rule);animation:rise .35s ease}
+.ev i{font-style:normal;font-family:var(--mono);color:var(--brass);font-size:13px}
+.truth{background:var(--brass-soft);border-radius:5px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.tells{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.tells div{border-top:2px solid var(--verd);padding-top:8px;font-size:15px}
+.tells b{display:block;font-size:15px}
+.timer{height:4px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.timer i{display:block;height:100%;background:var(--brass);transition:width 1s linear}
+.q{display:flex;flex-direction:column;gap:8px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.q .opts{gap:6px}
+.q .opt{padding:9px 12px;grid-template-columns:24px minmax(0,1fr)}
+.q .opt .k{width:22px;height:22px;font-size:11px}
+.key{background:var(--clay-soft);border-radius:5px;padding:12px 16px;font-size:15px}
+.coin{width:120px;height:120px;border-radius:50%;margin:6px auto;display:grid;place-items:center;font-family:var(--display);font-size:22px;background:radial-gradient(circle at 35% 30%,var(--brass-soft),var(--brass));color:var(--surface);border:3px solid var(--brass)}
+.coin.spin{animation:flip .9s ease-in-out}
+details.guide{border-top:1px solid var(--rule);padding-top:14px}
+details.guide summary{cursor:pointer;font-weight:700}
+details.guide > div{display:flex;flex-direction:column;gap:12px;margin-top:12px;font-size:15.5px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+.cols h3{font-size:19px;margin-bottom:4px}
+.note{font-size:13.5px;color:var(--muted)}
+.tally{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.tally div{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:6px 8px;font-family:var(--mono)}
+.tally button{width:28px;height:28px;border-radius:3px;border:1px solid var(--rule);background:var(--surface);cursor:pointer}
+
+/* Final */
+.verdict{display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:24px;align-items:center}
+@media (max-width:560px){.verdict{grid-template-columns:minmax(0,1fr)}}
+.iq{font-family:var(--display);font-size:clamp(80px,14vw,132px);line-height:.9}
+.iq small{font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:var(--muted);display:block;margin-top:8px}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.trio div{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.trio b{font-family:var(--mono);font-size:28px;font-variant-numeric:tabular-nums}
+.trio span{font-size:13px;color:var(--muted)}
+@media (max-width:520px){.trio{grid-template-columns:minmax(0,1fr)}}
+.mirrors{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.mirror{border:1px solid var(--rule);border-radius:5px;padding:16px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.mirror .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mirror .top b{font-family:var(--mono);font-size:24px;font-variant-numeric:tabular-nums}
+.mirror p{font-size:15px}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr) 44px;gap:12px;align-items:center;font-size:14.5px}
+.bar .tr{height:10px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.bar .tr i{display:block;height:100%;background:var(--verd)}
+.bar.low .tr i{background:var(--clay)}
+.bar.found .tr i{background:var(--brass)}
+.bar em{font-style:normal;font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:480px){.bar{grid-template-columns:minmax(0,1fr) 44px}.bar .tr{grid-column:1/-1;order:3}}
+.book{background:var(--bg);border:1px solid var(--rule);border-radius:5px;padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.book .defense{font-family:var(--display);font-size:19px;line-height:1.5;white-space:pre-line}
+.missions{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.missions div{border:1px solid var(--rule);border-radius:5px;padding:12px 14px;background:var(--surface);font-size:15px;display:flex;flex-direction:column;gap:4px}
+.missions b{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--brass)}
+.loading{color:var(--muted);font-style:italic}
+.plumb{max-width:150px;width:100%;justify-self:center}
+.plumb svg{width:100%;height:auto;display:block}
+@media (max-width:560px){.plumb{max-width:110px}}
+@keyframes rise{from{transform:translateY(6px);opacity:.3}to{transform:none;opacity:1}}
+@keyframes flip{0%{transform:rotateY(0)}100%{transform:rotateY(1080deg)}}
+@keyframes sway{0%,100%{transform:rotate(var(--tilt))}50%{transform:rotate(calc(var(--tilt) * .7))}}
+.swing{transform-origin:80px 6px;animation:sway 4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:4px;font-size:14px}
+</style>
+
+<div class="shell">
+  <aside class="rail" id="rail"></aside>
+  <main id="app"></main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+/* ---------------- Content ---------------- */
+const ELS = {
+  hon:{f:"Honesty",c:"Honesty"},
+  chas:{f:{a:"Chastity & Faithfulness",y:"Purity & Boundaries"},c:"Faithfulness & Boundaries"},
+  fair:{f:"Fairness & Equity",c:"Fairness & Equity"},
+  char:{f:"Charity",c:"Compassion"},
+  fam:{f:"Family",c:"Family & Belonging"},
+  pow:{f:"Power & Strength",c:"Use of Power"},
+  cont:{f:"Contentment",c:"Contentment"},
+  mercy:{f:"Not Vengeful",c:"Mercy"},
+  trans:{f:"Transparency",c:"Transparency"},
+  opp:{f:"Opportunity",c:"Second Chances"},
+  just:{f:"Justice",c:"Justice & Stewardship"}
+};
+const GATES = [
+  null,
+  {name:"The Mirror", els:"Honesty · Transparency", foe:"The Deception Dragon",
+   v:{f:["Let me be weighed in an even balance, that God may know mine integrity.","Job 31:6 (KJV)"], c:["Integrity is being the same person in the mirror as in the meeting.","Principle of the Mirror"]}},
+  {name:"The Garden", els:{f:{a:"Chastity · Faithfulness",y:"Purity · Boundaries"},c:"Faithfulness · Boundaries"}, foe:{a:"The Seducer’s Maze",y:"The Maze of Eyes"},
+   v:{f:["I made a covenant with mine eyes; why then should I think upon a maid?","Job 31:1 (KJV)"], c:["Faithfulness starts with where you let your attention rest, long before any choice is made.","Principle of the Garden"]}},
+  {name:"The Scales", els:"Fairness · Justice", foe:"The Corrupt Judge",
+   v:{f:["Did not he that made me in the womb make him?","Job 31:15 (KJV)"], c:["A fair scale weighs everyone the same, including the person holding it.","Principle of the Scales"]}},
+  {name:"The Open Door", els:{f:"Charity · Family",c:"Compassion · Family"}, foe:"The Hoarder’s Grip",
+   v:{f:["The stranger did not lodge in the street: but I opened my doors to the traveller.","Job 31:32 (KJV)"], c:["How people treat those who cannot repay them is the truest measure they give.","Principle of the Open Door"]}},
+  {name:"The Throne", els:{f:"Power · Strength",c:"Use of Power"}, foe:"The Tyrant’s Crown",
+   v:{f:["Doth not he see my ways, and count all my steps?","Job 31:4 (KJV)"], c:["Power does not change people so much as reveal them.","Principle of the Throne"]}},
+  {name:"The Vault", els:"Contentment", foe:"The Golden Cage",
+   v:{f:["If I have made gold my hope, or have said to the fine gold, Thou art my confidence…","Job 31:24 (KJV)"], c:["You either own your things, or they own you.","Principle of the Vault"]}},
+  {name:"The Summit", els:{f:"Not Vengeful · Opportunity",c:"Mercy · Second Chances"}, foe:"The Final Reckoning",
+   v:{f:["If I rejoiced at the destruction of him that hated me, or lifted up myself when evil found him…","Job 31:29 (KJV)"], c:["Mercy refuses to let someone else’s wrong decide who you become.","Principle of the Summit"]}}
+];
+const GATE_END = [null,
+  "The Mirror shows what you do when the change is wrong and the room is watching. Hold onto that. The room won’t always be watching.",
+  {f:"Job made a covenant with his eyes before he ever made a choice with his hands. Faithfulness starts upstream.",c:"Faithfulness starts upstream, with attention, long before it reaches your hands."},
+  "Scales only work if they weigh everyone the same, including the one holding them.",
+  "An open door costs something. That is how you know it is open.",
+  "Power reveals. Whatever was in a person before the crown, the crown makes louder.",
+  "The Vault asks one question: do you own your things, or do they own you?",
+  "Mercy is not pretending the wrong didn’t happen. It is refusing to let the wrong decide who you become."
+];
+
+// v = consistency value for paired scenes (1 = integrity choice, 0 = not)
+const SCN = {
+ change:{gate:1, ref:{f:["If I have walked with vanity, or if my foot hath hasted to deceit…","Job 31:5 (KJV)"]},
+  text:{a:"Friday lunch with your whole team at the café. You pay with a small note; the cashier, rushing, hands you change for a large one — about a day’s lunch money extra. Your team is right behind you in the queue.",
+        y:"Lunch break. The canteen is packed and your friends are right behind you. You paid with a small note, but the attendant hands you change for a big one — enough for a week of snacks."},
+  ask:"Would you make the same choice if the queue behind you were empty?",
+  opts:[
+   {t:"Hand the extra back right away.", d:{hon:3,trans:1}, v:1, c:{a:"The cashier exhales. “My till would have been short. Thank you.” Your team noticed.",y:"The attendant looks relieved. “I’d have paid that from my wages.” Your friends noticed."}},
+   {t:"Pocket it. Their mistake, not mine.", d:{hon:-2,cont:-1}, v:0, tal:15, c:"Nobody says anything. One person behind you gives you a look you can’t read."},
+   {t:"Joke about my lucky day, and keep it.", d:{hon:-2,trans:-1}, v:0, tal:15, c:"Laughter. The cashier laughs too, and counts the till twice at closing."},
+   {t:"Return it, loudly enough that everyone hears.", d:{hon:2,trans:-1}, v:1, c:"A little applause. You enjoy it slightly more than you expected to."}
+  ]},
+ error:{gate:1, ref:{f:["If I covered my transgressions as Adam, by hiding mine iniquity in my bosom…","Job 31:33 (KJV)"]},
+  text:{a:"A report you prepared went to the board last week. You’ve just found a mistake in it: a figure that makes your department look better than it is. Nobody has noticed. Correcting it means saying so at Monday’s meeting.",
+        y:"Your test comes back with a mark higher than you earned. The teacher added your marks up wrong, and it lifts you into the top three. Nobody else will ever check."},
+  ask:"What would it cost you to be the first to say it? What will it cost if someone else says it first?",
+  opts:{
+   a:[{t:"Raise it myself at Monday’s meeting.", d:{trans:3,hon:2}, c:"A pause in the room. Then the chair says, “This is why we trust your numbers.”"},
+      {t:"Quietly fix it in next quarter’s version.", d:{trans:-1}, flag:"errHidden", c:"No one knows, including the people who made decisions on the wrong number."},
+      {t:"Leave it. It’s minor.", d:{hon:-2,trans:-3}, flag:"errHidden", c:"Nothing happens. For now."},
+      {t:"Tell my manager privately and let them decide.", d:{trans:2,hon:2}, c:"Your manager raises it and credits you for catching it. Slower, but clean."}],
+   y:[{t:"Show the teacher the mistake after class.", d:{trans:3,hon:2}, c:"Your teacher corrects it, and writes “Thank you for your honesty” beside the new mark."},
+      {t:"Keep the mark, but study harder next time to deserve it.", d:{trans:-1}, flag:"errHidden", c:"The top-three list goes up on the noticeboard with your name on it."},
+      {t:"Say nothing. It’s the teacher’s mistake.", d:{hon:-2,trans:-3}, flag:"errHidden", c:"Nothing happens. For now."},
+      {t:"Tell a parent and ask what I should do.", d:{trans:2,hon:2}, c:"Your parent walks with you to see the teacher. It’s awkward for about four minutes."}]}},
+ creditSeen:{gate:1, ref:{f:["If I did despise the cause of my manservant or of my maidservant, when they contended with me…","Job 31:13 (KJV)"]},
+  text:{a:"In a meeting with the CEO, your quiet junior colleague Tolu suggested the idea that is now saving the project. The CEO turns to you: “Brilliant idea of yours.” Tolu is in the room, looking at the table.",
+        y:"In class, the teacher praises “your” answer to the hardest question. Your quiet deskmate Tolu actually worked it out and whispered it to you. Tolu is sitting right there."},
+  ask:"Who in this room has the least power to correct the record?",
+  opts:[
+   {t:"Correct it on the spot: “That was Tolu’s idea.”", d:{hon:2,fair:3}, v:1, c:{a:"The CEO looks at Tolu properly for the first time. Tolu sits up.",y:"The teacher turns to Tolu, who goes pink and grins."}},
+   {t:"Say thanks and move on. It was teamwork anyway.", d:{hon:-2,fair:-2}, v:0, tal:10, c:"You get the nod. Tolu stays quiet, in this room and in the next ones."},
+   {t:{a:"Accept it now; tell the CEO privately later.",y:"Accept it now; tell the teacher after class."}, d:{hon:1,fair:1}, v:.5, c:{a:"You do mention it later. By then the CEO has already told the story at the leadership retreat.",y:"You do tell the teacher later. The class only heard the first version."}}
+  ]},
+ garden:{gate:2, ref:{f:["I made a covenant with mine eyes…","Job 31:1 (KJV)"]},
+  text:{a:"You’re on a work trip, and you are married (or committed to someone). A colleague you’ve grown close to, and are honestly attracted to, suggests finishing the presentation “somewhere quieter: my room.” It’s 11pm.",
+        y:"A friend sends you a private photo of a classmate, one that classmate never meant anyone to see, with the message: “LOL forward this to the group.”"},
+  ask:{a:"Where did this choice actually start: tonight, or weeks ago?",y:"If that were your photo, what would you want the first person who received it to do?"},
+  opts:{
+   a:[{t:"Go. Nothing will happen. I’m an adult.", d:{chas:-2,fam:-1}, c:"Nothing happens tonight. But something has started, and you both know it."},
+      {t:"Suggest the hotel lobby instead.", d:{chas:2}, c:"The lobby is bright and boring. The deck gets finished."},
+      {t:"Decline, go to my room, and call home.", d:{chas:3,fam:2}, c:"Your partner picks up, sleepy and pleased. “You called.”"},
+      {t:"Go, but text my partner where I am.", d:{chas:0,trans:1}, c:"The text helps. The room still feels like a line you’ve walked right up to."}],
+   y:[{t:"Forward it. Everyone will see it anyway.", d:{chas:-3,mercy:-2,just:-1}, c:"By evening it has been shared forty times. Your name is on the first forward."},
+      {t:"Delete it and say nothing.", d:{chas:1}, c:"It stops with you. It doesn’t stop with everyone."},
+      {t:"Delete it and tell my friend it’s not okay.", d:{chas:2,just:1}, c:"Your friend calls you dramatic. Then quietly deletes it too."},
+      {t:"Delete it and tell a trusted adult so it can be stopped.", d:{chas:2,just:2,mercy:1}, c:"A teacher steps in before lunch. The classmate never learns who helped, but they are protected."}]}},
+ layoff:{gate:3, ref:{f:["Did not he that made me in the womb make him?","Job 31:15 (KJV)"]},
+  text:{a:"You manage a team of five, and budget cuts mean one role must go. Marcus is your most productive person, but he once undermined you in public. Grace is an average performer and a single mother of three. David is new, still learning, with real potential.",
+        y:"Group project. Your teacher asks each member to privately rate everyone’s contribution, and the ratings affect grades. Your best friend Dayo did almost nothing. Kemi, the quiet new student, did most of the work."},
+  ask:"Fairness isn’t always equal treatment. It’s right treatment. Whose side of this would you least like to be on?",
+  opts:{
+   a:[{t:"Let Marcus go. He undermined me.", d:{fair:-2,mercy:-2}, flag:"firedMarcus", c:"Marcus learns why. He starts telling a story about your leadership."},
+      {t:"Let Grace go. Performance is what matters.", d:{char:-2}, c:"The numbers work. The team goes quiet around you."},
+      {t:"Let David go. Last in, first out.", d:{fair:1,opp:-1}, c:"David’s mentor, your best performer, starts taking recruiters’ calls."},
+      {t:"Cut my own salary to save the role.", d:{fair:2,pow:2,char:1}, tal:-20, c:"Your boss notices. So does your household budget."},
+      {t:"Keep everyone, freeze all raises, and explain why openly.", d:{fair:2,trans:2}, c:"Some resent it. Most respect it. Nobody feels deceived."}],
+   y:[{t:"Rate everyone the same. It keeps the peace.", d:{fair:-1,hon:-1}, c:"Kemi’s grade drops to match Dayo’s. She notices."},
+      {t:"Rate Dayo high and Kemi high. Everyone wins.", d:{fair:-2,hon:-2}, c:"Dayo thanks you. Kemi’s work is now worth the same as nothing."},
+      {t:"Rate honestly, and tell Dayo beforehand that I will.", d:{fair:3,hon:2}, c:"Dayo is angry for two days. Then he asks you to help him study."},
+      {t:"Rate honestly without telling Dayo.", d:{fair:2,hon:1}, c:"The grades come out. Dayo guesses, and feels ambushed."}]}},
+ stream:{gate:3, ref:{f:["If my land cry against me, or that the furrows likewise thereof complain…","Job 31:38 (KJV)"]},
+  text:{a:"Your factory can cut costs by 15% by releasing waste water into the stream above a farming village. The law there is vague and enforcement is weak. The board wants the savings.",
+        y:"School clean-up competition. Your team has collected the most trash, but hauling it to the far bins will take an hour. A teammate suggests dumping it in the bush behind the fence. You’d still win."},
+  ask:"Who pays for this choice, and do they get a vote?",
+  opts:{
+   a:[{t:"Do it. It’s legal enough, and the board is pushing.", d:{just:-3}, tal:20, c:"Profits rise. Downstream, the first fish die in the dry season."},
+      {t:"Refuse, and propose a treatment plan even though it costs more.", d:{just:3,pow:1}, tal:-10, c:"The board grumbles, then approves a phased plan."},
+      {t:"Do it for a year while we look for alternatives.", d:{just:-1}, c:"A year becomes three. It usually does."},
+      {t:"Ask the village what they’d accept, and share the savings with them.", d:{just:2,fair:1}, c:"The village asks for clean water first. You build the treatment plant anyway, now with their trust."}],
+   y:[{t:"Dump it. We collected it; we still win.", d:{just:-3,hon:-1}, c:"You win the trophy. The bush behind the fence fills up over the term."},
+      {t:"Haul it properly, even if we finish late.", d:{just:3}, c:"You finish an hour late, sweaty, and still in first place."},
+      {t:"Dump half, carry half.", d:{just:-1}, c:"Half a problem is still a problem."},
+      {t:"Haul it, and report the spot others have been dumping in.", d:{just:3,trans:1}, c:"The principal organizes a clean-up of the bush. Your team is thanked by name."}]}},
+ bonus:{gate:4, ref:{f:["If I have withheld the poor from their desire, or have caused the eyes of the widow to fail…","Job 31:16 (KJV)"]},
+  text:{a:{f:"An unexpected bonus lands: enough for one big thing. Your mother’s roof leaks every time it rains. A widow in your church can’t pay her son’s school fees this term. And you promised yourself a new phone.",
+           c:"An unexpected bonus lands: enough for one big thing. Your mother’s roof leaks every time it rains. A widow in your neighbourhood can’t pay her son’s school fees this term. And you promised yourself a new phone."},
+        y:"You’ve saved for months for new sneakers. This week your little sister’s school-trip fee is due and your parents are short. A classmate can’t afford the trip either."},
+  ask:"What would the people closest to you say you value, if they only watched where your money went?",
+  opts:{
+   a:[{t:"The phone. I worked for this.", d:{char:-2,fam:-2,cont:-2}, tal:25, c:"The phone is excellent. The roof is still leaking."},
+      {t:"Fix Mum’s roof first, then help the widow with what’s left.", d:{fam:3,char:2,cont:2}, c:"Your mother sends a voice note during the first rain: no buckets."},
+      {t:"Pay the widow’s fees. Mum can wait one more season.", d:{char:3,fam:-1}, c:"The boy goes back to school. Your mother says “it’s fine” in a voice that isn’t."},
+      {t:"Split it three ways: roof patch, part of the fees, a cheaper phone.", d:{fam:1,char:1,cont:1}, tal:5, c:"Everything gets a bit better. Nothing gets fully fixed."}],
+   y:[{t:"Sneakers. I saved for them.", d:{fam:-2,char:-1,cont:-2}, tal:25, c:"They look great. Your sister stays home from the trip."},
+      {t:"Pay my sister’s fee and wait on the sneakers.", d:{fam:3,cont:2}, c:"Your sister comes home talking non-stop about the trip."},
+      {t:"Pay my sister’s fee, and ask my class to chip in for the classmate.", d:{fam:3,char:3,cont:2}, c:"Twelve classmates chip in. Your idea, their coins, one more seat on the bus."},
+      {t:"Split my savings between both trips.", d:{fam:1,char:2,cont:2}, c:"Both go. You wear your old sneakers with a strange kind of pride."}]}},
+ checkout:{gate:5, ref:{f:["Doth not he see my ways, and count all my steps?","Job 31:4 (KJV)"]},
+  text:{a:"11pm. The supermarket is nearly empty. At the self-checkout, the most expensive thing in your bag, worth about a day’s lunch money, doesn’t scan. The machine still says “Payment complete.” No attendant. No one around.",
+        y:"After school, the corner shop is empty. You’ve paid for your snacks, but the shopkeeper, half-asleep, charged you for one item instead of three. You notice once you’re outside."},
+  ask:"Who are you when the only witness is you?",
+  opts:[
+   {t:"Go back and pay for it.", d:{hon:3}, v:1, c:"The attendant blinks. “Nobody ever comes back.”"},
+   {t:"Leave. The machine made the mistake.", d:{hon:-2,cont:-1}, v:0, tal:15, c:"The doors close behind you. Nobody saw. That is the whole point of this scene."},
+   {t:"Leave, and tell myself I’ll pay next time.", d:{hon:-1}, v:.3, tal:15, c:"Next time comes. You don’t remember."},
+   {t:"Go back, pay, and tell them the scanner is faulty.", d:{hon:3,trans:1}, v:1, c:"They fix it. Tomorrow’s shoppers never know you did."}
+  ]},
+ panel:{gate:5, ref:{f:["If I have lifted up my hand against the fatherless, when I saw my help in the gate…","Job 31:21 (KJV)"]},
+  text:{a:"You chair a hiring panel. The strongest candidate once criticized your work in public, and fairly, if you’re honest. Another candidate, weaker, is the son of a close friend who asked you to “look out for him.”",
+        y:"As class captain, you pick five students for the regional quiz team. The strongest candidate mocked you last term. Your best friend wants a spot but scored lower in the trials."},
+  ask:"If the person you resent were judging you, how would you want them to decide?",
+  opts:{
+   a:[{t:"Hire the strongest candidate. The work comes first.", d:{pow:3,fair:2,opp:2}, c:"Your critic gets the role and becomes your sharpest ally."},
+      {t:"Hire my friend’s son. Loyalty matters.", d:{pow:-2,fair:-3}, c:"Your friend is grateful. The other panel members exchange a glance."},
+      {t:"Declare the conflict and step off the panel.", d:{pow:2,fair:2,trans:2}, c:"Slower and cleaner. Everyone trusts the result, whatever it is."},
+      {t:"Quietly reject both and pick someone in the middle.", d:{pow:-1,fair:-1}, c:"Safe for you. Unfair to the best candidate."}],
+   y:[{t:"Pick the strongest candidate. The team comes first.", d:{pow:3,fair:2,opp:2}, c:"They win the regional round and thank you in front of everyone."},
+      {t:"Pick my friend. Loyalty matters.", d:{pow:-2,fair:-3}, c:"Your friend is thrilled. The others know exactly why."},
+      {t:"Ask the teacher to make the final call, since I’m not neutral.", d:{pow:2,fair:2,trans:2}, c:"The teacher respects it. Nobody can say you played favourites."},
+      {t:"Leave both out and pick someone in the middle.", d:{pow:-1,fair:-1}, c:"No drama. No fairness either."}]}},
+ creditAlone:{gate:6, ref:{f:["Doth not he see my ways, and count all my steps?","Job 31:4 (KJV)"]},
+  text:{a:"Alone in the office late, finishing tomorrow’s presentation to the CEO. Tolu, now on leave, left a draft in the shared folder with the key insight. The slides carry no names. No one will ever ask who wrote what.",
+        y:"You’re filling in the group-project contribution form alone at home. Tolu wrote the best section. The teacher will never check who wrote what."},
+  ask:"Does this choice look different now that no one is in the room?",
+  opts:[
+   {t:{a:"Put Tolu’s name on the slide.",y:"Put Tolu’s name on that section."}, d:{hon:2,fair:3}, v:1, c:"It costs you nothing anyone can see. Tolu finds out months later and remembers it for years."},
+   {t:"Call it “the team’s” work.", d:{fair:0,hon:0}, v:.5, c:"Technically true. Tolu stays invisible."},
+   {t:{a:"Present it as mine.",y:"Claim that section as mine."}, d:{hon:-3,fair:-2}, v:0, tal:10, c:{a:"The CEO is impressed with you. The file’s version history is not.",y:"Your grade goes up. Tolu’s goes down."}}
+  ]},
+ offer:{gate:6, ref:{f:["If I have made gold my hope…","Job 31:24 (KJV)"]},
+  text:{a:"A rival firm offers you double your salary. The catch: you’d front a product you know underperforms, and the travel would mean missing most of your children’s evenings for two years.",
+        y:"A brand offers you free gadgets every month if you post that you “love” their energy drink. You’ve never tried it, and your younger followers would see the post."},
+  ask:"What is the real price here, and who else is paying it?",
+  opts:{
+   a:[{t:"Take it. Double is double.", d:{cont:-3,fam:-2,hon:-1}, tal:40, c:"The money arrives. So does a tiredness money doesn’t touch."},
+      {t:"Decline. Not at that price.", d:{cont:3,fam:2}, c:"Your children never know what you turned down. That is how it should be."},
+      {t:"Counter: only if I can be honest about the product and travel less.", d:{cont:2,hon:2,fam:1}, c:"They say no. You leave with your self-respect and a sharper sense of your worth."},
+      {t:"Use the offer to squeeze a raise from my current employer.", d:{cont:-1,trans:-1}, tal:15, c:"It works. Your boss now knows you are for sale."}],
+   y:[{t:"Take the deal and post it.", d:{cont:-2,hon:-3}, tal:40, c:"The gadgets arrive. So do messages from twelve-year-olds asking where to buy it."},
+      {t:"Turn it down.", d:{cont:3,hon:1}, c:"Your feed stays yours."},
+      {t:"Try the drink first, and only post my honest opinion.", d:{cont:1,hon:3}, c:"You hate it. You say so politely. The brand moves on."},
+      {t:"Take the gadgets and post, with #ad in tiny letters.", d:{cont:-1,hon:-1}, tal:30, c:"Legal, mostly. True, not really."}]}},
+ chat:{gate:7, ref:{f:["If I rejoiced at the destruction of him that hated me…","Job 31:29 (KJV)"]},
+  text:{a:"@FOE has just been let go in front of everyone. The office group chat is roasting him. You have a screenshot of something he once said that would make it much worse.",
+        y:"Bisi, who spread lies about you all last term, has just been dropped from the team in front of everyone. The class group chat is mocking her. You have a screenshot of something she said that would make it much worse."},
+  ask:"What do you want to be true about you after this chat goes quiet?",
+  opts:[
+   {t:"Post the screenshot. Let everyone see who they really are.", d:{mercy:-3,just:-1}, c:"The chat explodes. It feels good for about nine minutes."},
+   {t:"Stay out of it.", d:{mercy:1}, c:"Silence is safe. It isn’t kind."},
+   {t:"Message them privately: “Sorry this is happening. You okay?”", d:{mercy:3,opp:1}, c:"No reply for a day. Then: “Didn’t expect that from you. Thank you.”"},
+   {t:"Ask the group to stop piling on.", d:{mercy:2,just:2}, c:"Two people leave the chat. One thanks you privately."}
+  ]},
+ "return":{gate:7, ref:{f:["Oh that one would hear me! behold, my desire is, that the Almighty would answer me…","Job 31:35 (KJV)"]},
+  text:{a:"Years ago, an employee stole from your business. You let him go and never pressed charges. Now he’s two years into recovery, with references from his programme, and he has applied for a job with you.",
+        y:"Last season a teammate lied to the coach to take your position. He has apologized in front of the team, and now he’s asking you to support his return."},
+  ask:"How many second chances have you needed? Who gave them to you?",
+  opts:{
+   a:[{t:"No. Once a thief, always a thief.", d:{opp:-3,mercy:-1}, c:"Your reasoning is airtight. So is the door."},
+      {t:"Interview him on the same terms as everyone else.", d:{opp:3,fair:2}, c:"He isn’t the strongest candidate. He is the most grateful one."},
+      {t:"Hire him with safeguards everyone can see: clear controls and a mentor.", d:{opp:3,just:2,trans:1}, c:"Trust, rebuilt with scaffolding. It holds."},
+      {t:"Say yes to his face, then quietly make sure he isn’t shortlisted.", d:{opp:-2,hon:-3,trans:-2}, c:"He thanks you. You will be avoiding him for a while."}],
+   y:[{t:"No. He made his choice.", d:{opp:-3,mercy:-1}, c:"Your reasoning is airtight. So is the door."},
+      {t:"Support his return on the same terms as everyone else.", d:{opp:3,fair:2}, c:"He trains harder than anyone. He knows why."},
+      {t:"Support it with clear conditions the coach sets.", d:{opp:3,just:2,trans:1}, c:"Trust, rebuilt with scaffolding. It holds."},
+      {t:"Say I support him, then tell the coach privately I don’t.", d:{opp:-2,hon:-3,trans:-2}, c:"He thanks you. You will be avoiding him for a while."}]}}
+};
+const PLANK = {
+ p1o:{other:true, text:{a:"A colleague’s CV says they “led” a project they only supported.",y:"A classmate hands in an essay an AI wrote, as their own work."}},
+ p2o:{other:true, text:{a:"A neighbour borrowed your ladder and returned it with a cracked rung, saying nothing.",y:"A friend borrowed your headphones and returned them with a broken earpiece, saying nothing."}},
+ p2s:{other:false, text:{a:"You borrowed a neighbour’s ladder and cracked a rung. You returned it without mentioning it; you were embarrassed.",y:"You borrowed a friend’s headphones and broke an earpiece. You gave them back without saying anything; you were embarrassed."}},
+ p1s:{other:false, text:{a:"Your CV says you “led” a project you only supported. The job market is brutal and you needed an edge.",y:"You hand in an essay an AI wrote, as your own work. You had three tests that week."}}
+};
+const CASES = {
+ femi:{who:{a:{f:"Brother Femi, who coaches the church youth football team",c:"Femi, who coaches the community youth football team"},y:"Coach Femi, who runs your football team"},
+  cards:["A parent saw him walking out of a betting shop at 11pm on a weeknight.",
+         "He has missed three of the last five training sessions without explanation.",
+         "This month he quietly borrowed money from two parents, promising to repay by Friday.",
+         "Both parents confirm he repaid every coin, on Friday, as promised."],
+  truth:true,
+  reveal:"Femi’s younger brother is fighting a gambling addiction. Femi had been pulling him out of betting shops at night, clearing his debts, and sitting with him in counselling, which is where the missed sessions went. He told no one, to protect his brother’s dignity.",
+  lesson:"Job’s three friends looked at the evidence of his suffering and concluded he must have sinned. They were wrong, and confident. Appearances are evidence, but they are rarely the whole of it."},
+ bayo:{who:{a:"Chief Bayo, the town’s best-known benefactor",y:"Mr. Bayo, who sponsors your school’s prize-giving"},
+  cards:["He funded the new library wing. His name is on the door.",
+         "He speaks at every prize-giving about honesty and hard work.",
+         "Two of his drivers say he docks their pay whenever traffic makes them late.",
+         "Records show the wing cost about a third of what he declared for his tax relief."],
+  truth:false,
+  reveal:"Generosity in public, pressure in private. The people with no power and the books told the real story. The library is real, and so is the fraud.",
+  lesson:"Public generosity is the easiest thing to perform. Watch how someone treats people who cannot repay them, and whether the record matches the speech."}
+};
+const QUIZ = [
+ {q:"The word “integrity” comes from the Latin integer. What does integer mean?", o:["Honest","Whole, undivided","Strong","Upright"], a:1},
+ {q:{f:"In the Book of Job, how many friends came to comfort Job before Elihu spoke?",c:"Builders use a plumb line to check that a wall is…"},
+  o:{f:["Two","Three","Four","Seven"],c:["Level along the ground","Truly vertical","The right length","Strong enough"]}, a:1},
+ {q:"In a well-known study, people rolled a die in private and were paid according to the number they reported. What did researchers find?",
+  o:["Almost everyone reported honestly","Most people lied to get the maximum","Many shaded the truth a little; few lied all the way","Women lied more than men"], a:2}
+];
+const RANKS = [
+ [95,{f:"The Job",c:"The Keystone"},"Unwavering integrity under pressure"],
+ [85,"The Sage","Wise and consistently principled"],
+ [75,"The Guardian","A strong foundation with growing edges"],
+ [65,"The Warrior","Fighting well; needs refinement"],
+ [50,"The Seeker","Honest about the journey ahead"],
+ [0,"The Rough Stone","Raw material, much polishing ahead"]
+];
+const MISSIONS = {
+ hon:"For seven days, correct one small exaggeration of your own every day, out loud, within the hour.",
+ chas:{a:"Name one boundary that protects your closest commitment, and tell the person it protects.",y:"Choose one thing you will never forward or share about someone else, and tell a friend your rule."},
+ fair:"Ask the person with the least power in your team or class what feels unfair, and change one thing.",
+ char:"Do one kind thing this week for someone who cannot repay or even thank you.",
+ fam:"Give one family member an hour of undivided attention, phone in another room.",
+ pow:"Use whatever influence you have to open one door for someone who isn’t in your circle.",
+ cont:"Go seven days without buying anything you don’t need. Give away one thing you do like.",
+ mercy:"Pray for, or wish well to, one person who wronged you, by name, every day this week.",
+ trans:"Tell someone about a mistake of yours before they find it.",
+ opp:"Give one person a real second chance this week, and tell them that’s what it is.",
+ just:"Leave one shared space, physical or online, cleaner than you found it, every day for a week."
+};
+
+/* ---------------- State ---------------- */
+const KEY = "undivided-quest-v1";
+const FRESH = () => ({v:1, step:-1, name:"", lens:"f", set:"a", mode:"solo", exam:false,
+  selfHonest:7, promise:null, road:null, ans:{}, why:{}, planks:{}, coins:[], quiz:null, cases:{}, flags:{}, tal:0,
+  tally:{}, council:{players:10}, book:null, trial:null, cohort:null, research:false, run:null});
+let S = FRESH();
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function load(){ try{ const x = JSON.parse(localStorage.getItem(KEY)||"null"); return x && x.v===1 ? x : null; }catch(e){ return null; } }
+
+const STEPS = [
+ {k:"covenant"},{k:"promise"},
+ {k:"gate",g:1},{k:"choice",id:"change"},{k:"choice",id:"error"},{k:"choice",id:"creditSeen"},{k:"coin",n:0},{k:"gateEnd",g:1},
+ {k:"gate",g:2},{k:"choice",id:"garden"},{k:"plank",id:"p1o"},{k:"gateEnd",g:2},
+ {k:"gate",g:3},{k:"choice",id:"layoff"},{k:"plank",id:"p2o"},{k:"quiz"},{k:"choice",id:"stream"},{k:"gateEnd",g:3},
+ {k:"gate",g:4},{k:"choice",id:"bonus"},{k:"case",id:"femi"},{k:"coin",n:1},{k:"gateEnd",g:4},
+ {k:"gate",g:5},{k:"echo"},{k:"choice",id:"checkout"},{k:"choice",id:"panel"},{k:"case",id:"bayo"},{k:"gateEnd",g:5},
+ {k:"gate",g:6},{k:"choice",id:"creditAlone"},{k:"choice",id:"offer"},{k:"plank",id:"p2s"},{k:"road"},{k:"gateEnd",g:6},
+ {k:"gate",g:7},{k:"choice",id:"chat"},{k:"choice",id:"return"},{k:"plank",id:"p1s"},{k:"coin",n:2},{k:"gateEnd",g:7},
+ {k:"final"}
+];
+
+/* ---------------- Helpers ---------------- */
+const $ = s => document.querySelector(s);
+function pick(x){
+  if(x==null) return x;
+  if(typeof x==="object" && !Array.isArray(x)){
+    if("a" in x || "y" in x) return pick(S.set==="y" ? (x.y ?? x.a) : (x.a ?? x.y));
+    if("f" in x || "c" in x) return pick(S.lens==="f" ? (x.f ?? x.c) : (x.c ?? x.f));
+  }
+  return x;
+}
+const guide = () => S.lens==="f" ? "Elihu" : "The Witness";
+function esc(s){ return String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function T(x){ return esc(pick(x)); }
+const elName = k => pick(ELS[k]);
+function toast(m){ const t=$("#toast"); t.textContent=m; t.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>t.hidden=true,2400); }
+function gateOf(i){ let g=0; for(let j=0;j<=i && j<STEPS.length;j++){ if(STEPS[j].k==="gate") g=STEPS[j].g; } return g; }
+function optsOf(id){ return pick(SCN[id].opts); }
+const clamp = (v,a=0,b=100)=>Math.max(a,Math.min(b,v));
+
+/* ---------------- Backend (Supabase) ---------------- */
+const CFG = window.UNDIVIDED_CONFIG || {};
+const backendReady = () => !!(CFG.supabaseUrl && CFG.supabaseKey && !/YOUR-/.test(CFG.supabaseUrl+CFG.supabaseKey));
+// The guide's prompts are built on the server (supabase/functions/guide), so the API key and prompts never reach the browser.
+async function ai(task, data){
+  if(!backendReady()) throw new Error("offline");
+  const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), 45000);
+  try{
+    const r = await fetch(CFG.supabaseUrl.replace(/\/$/,"")+"/functions/v1/guide", {method:"POST", signal:ctl.signal,
+      headers:{"Content-Type":"application/json","apikey":CFG.supabaseKey},
+      body:JSON.stringify({task, lens:S.lens, setting:S.set, mode:S.mode, data})});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || j.error) throw new Error(j.error || ("guide "+r.status));
+    return j.result;
+  } finally { clearTimeout(tm); }
+}
+async function rpc(name, args){
+  if(!backendReady()) throw new Error("offline");
+  const r = await fetch(CFG.supabaseUrl.replace(/\/$/,"")+"/rest/v1/rpc/"+name, {method:"POST",
+    headers:{"Content-Type":"application/json","apikey":CFG.supabaseKey}, body:JSON.stringify(args||{})});
+  const j = await r.json().catch(()=>null);
+  if(!r.ok) throw new Error((j && (j.message||j.hint)) || ("rpc "+r.status));
+  return j;
+}
+
+/* ---------------- Rail ---------------- */
+function rail(){
+  const g = S.step>=0 ? gateOf(S.step) : 0;
+  const finished = S.step>=0 && STEPS[S.step].k==="final";
+  let nodes = "";
+  for(let i=1;i<=7;i++){
+    const cls = finished || i<g ? "done" : (i===g ? "now" : "");
+    nodes += `<div class="node ${cls}"><span>Gate ${i}</span>${esc(GATES[i].name)}</div>`;
+  }
+  $("#rail").innerHTML = `
+    <div class="brand">Undivided<small>The Integrity Quest</small></div>
+    ${S.step>=0 ? `<div class="path" aria-label="Quest progress">${nodes}</div>
+    <div class="purse"><span>Talents</span><b>${S.tal}</b></div>
+    <div class="guidebox"><b>${esc(guide())}</b>${S.mode==="council"?"Council mode: one device, one shared decision per scene.":(S.exam?"Examiner mode: I will stay silent until the end.":"I’m with you for the whole quest. Ask me anything at any scene.")}</div>` : ""}`;
+}
+
+/* ---------------- Screens ---------------- */
+function go(i){ S.step=i; save(); render(); window.scrollTo({top:0,behavior:"smooth"}); }
+function next(){ go(S.step+1); }
+
+function render(){
+  rail();
+  const app = $("#app");
+  if(S.step<0) return start(app);
+  const st = STEPS[S.step];
+  ({covenant,promise,gate,choice,coin,gateEnd,plank,quiz,"case":caseStep,echo,road,final})[st.k](app, st);
+}
+
+function start(app){
+  const saved = load();
+  const resume = saved && saved.step>=0 && STEPS[saved.step] && STEPS[saved.step].k!=="final";
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">A game of character · Job 31 · 11 elements</div>
+    <h1>Undivided</h1>
+    <p class="lede">Integrity means whole: the same person seen and unseen, today and tomorrow, judging yourself and judging others. Seven gates. Real-life choices. A guide who notices. At the end, the Book of Your Life.</p>
+    ${resume ? `<div class="conseq"><b>Quest in progress</b><p>${esc(saved.name||"A traveller")} is at Gate ${gateOf(saved.step)}, ${esc(GATES[gateOf(saved.step)]?.name||"the start")}.</p><div class="row"><button class="btn" id="resume">Continue the quest</button><button class="btn ghost" id="discard">Start over</button></div></div>`:""}
+    <label class="field" for="nm">Your name or team name (optional)
+      <input type="text" id="nm" maxlength="40" value="${esc(S.name)}" placeholder="e.g. Ada, or Grade 10 Blue"></label>
+    ${backendReady()?`<div class="setgroup"><span>Group code (optional)</span>
+      <div class="row" style="flex-wrap:nowrap"><input type="text" id="gc" maxlength="8" autocomplete="off" value="${esc(S.cohort?S.cohort.code:"")}" placeholder="From your teacher, pastor or team lead" style="text-transform:uppercase"><button class="btn ghost small" id="gcb">Join</button></div>
+      <p class="note" id="gcmsg">${S.cohort?"Joined: "+esc(S.cohort.name)+". Your leader sees only group totals, never your own results.":"Your name is never sent to the group. Leaders see group totals only, once 5 or more people have played."}</p></div>`:""}
+    <div class="setgroup"><span>Lens</span><div class="seg" id="lens">
+      <button data-v="f" aria-pressed="${S.lens==="f"}"><b>Faith</b><small>Job 31 and Scripture. Your guide is Elihu.</small></button>
+      <button data-v="c" aria-pressed="${S.lens==="c"}"><b>Civic</b><small>Same quest, no religious language. Your guide is The Witness.</small></button></div></div>
+    <div class="setgroup"><span>Setting</span><div class="seg" id="set">
+      <button data-v="a" aria-pressed="${S.set==="a"}"><b>Life &amp; Work</b><small>Adults: boardrooms, families, congregations.</small></button>
+      <button data-v="y" aria-pressed="${S.set==="y"}"><b>School</b><small>Ages 12–18: classrooms, teams, group chats.</small></button></div></div>
+    <div class="setgroup"><span>Mode</span><div class="seg" id="mode">
+      <button data-v="solo" aria-pressed="${S.mode==="solo"}"><b>Solo Quest</b><small>One player, about 25 minutes.</small></button>
+      <button data-v="council" aria-pressed="${S.mode==="council"}"><b>The Council</b><small>A group around one screen, with a facilitator.</small></button></div></div>
+    <label class="row" style="gap:8px;font-size:15px"><input type="checkbox" id="exam" ${S.exam?"checked":""}> Examiner mode: no feedback until the very end (harder)</label>
+    <div class="row"><button class="btn brass" id="go">Begin the quest</button><span class="note">Have a real coin nearby. You’ll need it three times.</span></div>
+    <details class="guide"><summary>For schools, boardrooms and churches</summary><div>
+      <div class="cols">
+        <div><h3>What it measures</h3><p>Choices across the 11 elements of Job 31, plus four hidden “mirrors” that test wholeness: seen vs. unseen, saying vs. doing, judging yourself vs. others, and promises over time. A fifth score, Discernment, measures how well you judge other people’s integrity from evidence.</p></div>
+        <div><h3>Running a Council</h3><p>Project the game. For each scene, give the room three minutes to discuss, take a show of hands, enter the tally, then agree one Council decision. For the coin flips, everyone flips and heads raise a hand: the room learns something about itself that no single person is exposed by.</p></div>
+        <div><h3>Ground rules</h3><p>This is a reflection tool, not a validated psychometric test. Never use results for hiring, discipline or grading. Share individual results only by the player’s choice. Every hidden test is revealed and explained at the end.</p></div>
+      </div></div></details>
+  </div>`;
+  const segs = (id,key)=> app.querySelectorAll(`#${id} button`).forEach(b=> b.onclick=()=>{ S[key]=b.dataset.v; app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed", x===b)); });
+  segs("lens","lens"); segs("set","set"); segs("mode","mode");
+  const gcb=$("#gcb"); if(gcb) gcb.onclick=async()=>{
+    const code=$("#gc").value.trim().toUpperCase(); const msg=$("#gcmsg");
+    if(!code){ S.cohort=null; msg.textContent="No group. You’re playing on your own."; return; }
+    gcb.disabled=true; msg.textContent="Checking…";
+    try{
+      const rows = await rpc("ud_check_cohort",{p_code:code});
+      const c = rows && rows[0];
+      if(!c){ S.cohort=null; msg.textContent="No group has that code. Check it with your leader."; }
+      else{
+        S.cohort={code,name:c.name};
+        if(c.lens) S.lens=c.lens; if(c.setting) S.set=c.setting;
+        ["lens","set"].forEach(id=> app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed", x.dataset.v===S[id==="lens"?"lens":"set"])));
+        msg.textContent=`Joined: ${c.name}. Your leader sees only group totals, never your own results.`;
+      }
+    }catch(e){ msg.textContent="Couldn’t reach the group server. You can still play on your own."; }
+    gcb.disabled=false;
+  };
+  $("#go").onclick = ()=>{ const keep={name:$("#nm").value.trim(),lens:S.lens,set:S.set,mode:S.mode,exam:$("#exam").checked,cohort:S.cohort}; S=Object.assign(FRESH(),keep); go(0); };
+  if(resume){ $("#resume").onclick=()=>{ S=saved; render(); }; $("#discard").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} render(); }; }
+}
+
+function covenant(app){
+  const faith = S.lens==="f";
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">Before the first gate</div>
+    <h2>The covenant</h2>
+    ${faith?`<blockquote class="verse">I made a covenant with mine eyes…<br>Doth not he see my ways, and count all my steps?<cite>Job 31:1, 4 (KJV)</cite></blockquote>`:""}
+    <p class="scene">This quest watches what you <em>do</em>, not only what you say. Some moments are tests you may not recognize as tests. Nothing stays hidden from you: at the end, every one of them is revealed and explained.</p>
+    <p class="scene">${faith?"Job asked, “Doth not he see my ways?” The question here is gentler and harder: do <em>you</em>?":"There are no trick questions and no right persona to perform. The only way to lose is to play as someone you are not."}</p>
+    <label class="field" for="sh">${S.mode==="council"?"As a group, how honest would you say you are?":"Before you begin: how honest are you, really?"}
+      <input type="range" id="sh" min="0" max="10" value="${S.selfHonest}"><div class="scale"><span>0 · Not at all</span><b id="shv" class="big" style="font-size:22px">${S.selfHonest}</b><span>10 · Completely</span></div></label>
+    <label class="row" style="gap:8px"><input type="checkbox" id="ok"> I’ll play as myself.</label>
+    ${backendReady()?`<label class="row" style="gap:8px;font-size:15px;align-items:flex-start"><input type="checkbox" id="rc" ${S.research?"checked":""} style="margin-top:5px"> <span>Optional: save my results anonymously to help research on integrity. No name, no email, and nothing I write is saved.</span></label>`:""}
+    <div class="row"><button class="btn brass" id="go" disabled>Enter the quest</button></div></div>`;
+  const rc=$("#rc"); if(rc) rc.onchange=e=>{ S.research=e.target.checked; save(); };
+  $("#sh").oninput=e=>{ S.selfHonest=+e.target.value; $("#shv").textContent=S.selfHonest; };
+  $("#ok").onchange=e=> $("#go").disabled=!e.target.checked;
+  $("#go").onclick=()=>{ save(); next(); };
+}
+
+function promise(app){
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">At the city gate</div>
+    <h2>Mara’s request</h2>
+    <p class="scene">An old woman named Mara stops you as you set out. “Traveller, when you leave the Vault, the sixth gate, take the <b>Market Lane</b>, not the Golden Road. I’ll be waiting there with a basket too heavy for me to carry home. Will you come?”</p>
+    <div class="opts" id="o"></div><div id="after"></div></div>`;
+  const o=[["yes","“I promise. I’ll be there.”"],["no","“I’m sorry. I can’t promise that.”"],["maybe","“Maybe, if I can.”"]];
+  $("#o").innerHTML = o.map((x,i)=>`<button class="opt" data-v="${x[0]}"><span class="k">${"ABC"[i]}</span><span>${esc(x[1])}</span></button>`).join("");
+  app.querySelectorAll(".opt").forEach(b=> b.onclick=()=>{
+    S.promise=b.dataset.v; save();
+    app.querySelectorAll(".opt").forEach(x=>{ x.disabled=true; x.classList.toggle("picked",x===b); });
+    const r = {yes:"Mara squeezes your hand. “Then I’ll wait.”", no:"Mara nods slowly. “An honest no is better than a careless yes.”", maybe:"Mara smiles a little. “I’ll look for you.”"}[S.promise];
+    $("#after").innerHTML = `<div class="conseq"><p>${r}</p><div class="row"><button class="btn" id="n">Walk to the first gate</button></div></div>`;
+    $("#n").onclick=next;
+  });
+}
+
+function gate(app, st){
+  const G=GATES[st.g], v=pick(G.v);
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">Gate ${st.g} of 7 · ${T(G.els)}</div>
+    <h2>${esc(G.name)}</h2>
+    <p class="lede">Guarding this gate: <b>${T(G.foe)}</b>.</p>
+    <blockquote class="verse">${esc(v[0])}<cite>${esc(v[1])}</cite></blockquote>
+    <div class="row"><button class="btn brass" id="n">Pass through</button></div></div>`;
+  $("#n").onclick=next;
+}
+
+function chipsFor(d, tal){
+  let h = Object.entries(d||{}).filter(([,v])=>v!==0).map(([k,v])=>`<span class="chip ${v<0?"neg":""}">${esc(elName(k))} ${v>0?"+":""}${v}</span>`).join("");
+  if(tal) h += `<span class="chip gold">${tal>0?"+":""}${tal} talents</span>`;
+  return h;
+}
+
+function choice(app, st){
+  const sc=SCN[st.id]; const opts=optsOf(st.id);
+  let text = pick(sc.text);
+  if(st.id==="chat" && S.set==="a") text = S.flags.firedMarcus
+    ? "Marcus, whom you let go in the budget cuts and who has bad-mouthed you ever since, has just been fired from his new job, and everyone knows. Your old team’s group chat is roasting him. You have a screenshot of something he once said that would make it much worse."
+    : text.replace("@FOE", "Kunle, a colleague who spread rumours about you for a year,");
+  const ref = S.lens==="f" && sc.ref ? sc.ref.f : null;
+  const answered = S.ans[st.id];
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">Gate ${sc.gate} · ${esc(GATES[sc.gate].name)}</div>
+    <p class="scene">${esc(text)}</p>
+    ${ref?`<blockquote class="verse">${esc(ref[0])}<cite>${esc(ref[1])}</cite></blockquote>`:""}
+    ${S.mode==="council"?`<div class="ask"><b>Discuss · 3 minutes</b><p>${T(sc.ask)}</p></div>`:""}
+    <div class="opts" id="o">${opts.map((op,i)=>`<button class="opt" data-i="${i}"><span class="k">${"ABCDE"[i]}</span><span>${T(op.t)}</span></button>`).join("")}</div>
+    ${S.mode==="council"?`<div class="setgroup"><span>Room tally (show of hands)</span><div class="tally" id="tally"></div></div>`:""}
+    <div class="row" id="askrow"><button class="btn ghost small" id="askbtn">Ask ${esc(guide())} before deciding</button></div>
+    <div id="askout"></div>
+    <div id="after"></div></div>`;
+  if(S.mode==="council") drawTally(st.id, opts.length);
+  $("#askbtn").onclick=()=>askGuide(sc, text, opts);
+  const choose = (i)=>{
+    const op=opts[i];
+    app.querySelectorAll("#o .opt").forEach(x=>{ x.disabled=true; x.classList.toggle("picked", +x.dataset.i===i); });
+    $("#askrow").hidden=true;
+    if(answered==null){
+      S.ans[st.id]=i; if(op.flag) S.flags[op.flag]=true; if(op.tal) S.tal+=op.tal; save(); rail();
+    }
+    const fb = S.exam ? `<p class="note">Recorded. ${esc(guide())} will speak at the end.</p>`
+      : `<p>${T(op.c)}</p><div class="chips">${chipsFor(op.d, op.tal)}</div>`;
+    $("#after").innerHTML = `<div class="conseq">${fb}
+      <label class="field" for="why">${S.mode==="council"?"Why did the Council choose this? (optional)":"Why did you choose this? (optional; "+esc(guide())+" reads it at the end)"}<textarea id="why" maxlength="400">${esc(S.why[st.id]||"")}</textarea></label>
+      <div class="row"><button class="btn" id="n">Continue</button></div></div>`;
+    $("#why").oninput=e=>{ S.why[st.id]=e.target.value; save(); };
+    $("#n").onclick=next;
+  };
+  app.querySelectorAll("#o .opt").forEach(b=> b.onclick=()=>choose(+b.dataset.i));
+  if(answered!=null) choose(answered);
+}
+
+function drawTally(id, n){
+  const t = S.tally[id] || (S.tally[id]=Array(n).fill(0));
+  $("#tally").innerHTML = t.map((c,i)=>`<div><b>${"ABCDE"[i]}</b><button data-i="${i}" data-d="-1" aria-label="Minus one for ${"ABCDE"[i]}">−</button><span>${c}</span><button data-i="${i}" data-d="1" aria-label="Plus one for ${"ABCDE"[i]}">+</button></div>`).join("");
+  $("#tally").querySelectorAll("button").forEach(b=> b.onclick=()=>{ t[+b.dataset.i]=Math.max(0,t[+b.dataset.i]+ +b.dataset.d); save(); drawTally(id,n); });
+}
+
+async function askGuide(sc, text, opts){
+  const out=$("#askout"); const fallback = pick(sc.ask);
+  out.innerHTML = `<div class="ask"><b>${esc(guide())}</b><p class="loading" id="askp">Thinking…</p></div>`;
+  const p = $("#askp");
+  try{
+    const t = await ai("ask", {scene:text, options:opts.map(o=>pick(o.t))});
+    p.classList.remove("loading"); p.textContent = t || fallback;
+  }catch(e){ p.classList.remove("loading"); p.textContent = fallback; }
+}
+
+function coin(app, st){
+  const n=st.n; const rec=S.coins[n];
+  const council = S.mode==="council";
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">The Honest Coin · ${n+1} of 3</div>
+    <h2>Flip a real coin</h2>
+    ${council
+      ? `<p class="scene">Everyone in the room: flip a real coin. Heads earns your Council 10 talents per head. Those who got heads, raise a hand.</p>
+         <div class="cols"><label class="field" for="np">People who flipped<input type="number" id="np" min="1" max="500" value="${S.council.players}"></label>
+         <label class="field" for="nh">Hands raised for heads<input type="number" id="nh" min="0" max="500" value="${rec?rec.h:0}"></label></div>
+         <div class="row"><button class="btn brass" id="rec">Record</button></div>`
+      : `<p class="scene">Heads earns you 10 talents. Tails earns nothing. The quest cannot see your coin. Only you can. Report what landed.</p>
+         <div class="coin" id="c">?</div>
+         <div class="row" id="btns"><button class="btn brass" data-r="H">It landed heads</button><button class="btn ghost" data-r="T">It landed tails</button><button class="btn ghost small" data-r="D">No coin: flip for me</button></div>`}
+    <div id="after"></div></div>`;
+  const done = (msg)=>{ $("#after").innerHTML = `<div class="conseq"><p>${msg}</p><div class="row"><button class="btn" id="n">Continue</button></div></div>`; $("#n").onclick=next; };
+  if(council){
+    $("#rec").onclick=()=>{
+      const p=clamp(+$("#np").value||1,1,500), h=clamp(+$("#nh").value||0,0,p);
+      S.council.players=p;
+      if(!S.coins[n]){ S.tal+=h*10; }
+      S.coins[n]={council:true,p,h}; save(); rail();
+      done(`Recorded: ${h} of ${p}. The result is revealed at the end.`);
+    };
+    return;
+  }
+  const finish=(r,digital)=>{
+    app.querySelectorAll("#btns button").forEach(b=>b.disabled=true);
+    if(!S.coins[n]){ S.coins[n]={r,digital}; if(r==="H") S.tal+=10; save(); rail(); }
+    const c=$("#c"); c.textContent = r==="H"?"Heads":"Tails";
+    done(digital ? "The quest flipped for you, in plain sight." : (r==="H"?"Ten talents to you.":"Nothing this time."));
+  };
+  if(rec){ finish(rec.r, rec.digital); return; }
+  app.querySelectorAll("#btns button").forEach(b=> b.onclick=()=>{
+    if(b.dataset.r==="D"){ const c=$("#c"); c.classList.remove("spin"); void c.offsetWidth; c.classList.add("spin"); app.querySelectorAll("#btns button").forEach(x=>x.disabled=true);
+      setTimeout(()=>finish(Math.random()<.5?"H":"T", true), 950); }
+    else finish(b.dataset.r,false);
+  });
+}
+
+function plank(app, st){
+  const P=PLANK[st.id]; const val = S.planks[st.id] ?? 5;
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">Gate ${gateOf(S.step)} · A quick judgment</div>
+    <p class="scene">${T(P.text)}</p>
+    <label class="field" for="pv">How serious is this?
+      <input type="range" id="pv" min="0" max="10" value="${val}"><div class="scale"><span>0 · No big deal</span><b id="pvv" class="big" style="font-size:22px">${val}</b><span>10 · Very serious</span></div></label>
+    <div class="row"><button class="btn" id="n">Record and continue</button></div></div>`;
+  $("#pv").oninput=e=> $("#pvv").textContent=e.target.value;
+  $("#n").onclick=()=>{ S.planks[st.id]=+$("#pv").value; save(); next(); };
+}
+
+function quiz(app){
+  if(S.quiz && S.quiz.done){ next(); return; }
+  const Q = S.quiz || (S.quiz={ans:[null,null,null], keyEarly:false, done:false});
+  let left = 45, timer=null, submitted=false;
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">Gate 3 · The Scales Quiz</div>
+    <h2>Three questions, 45 seconds</h2>
+    <p>Answer from memory. You score yourself afterwards, and earn 5 talents for each one you got right. The answer key is for checking afterwards.</p>
+    <div class="timer"><i id="tm" style="width:100%"></i></div>
+    <div id="qs"></div>
+    <div class="row"><button class="btn" id="sub">Submit answers</button><button class="btn ghost small" id="key">Answer key</button></div>
+    <div id="keybox"></div><div id="after"></div></div>`;
+  $("#qs").innerHTML = QUIZ.map((q,i)=>`<div class="q"><b>${i+1}. ${T(q.q)}</b><div class="opts">${pick(q.o).map((o,j)=>`<button class="opt" data-q="${i}" data-j="${j}"><span class="k">${"ABCD"[j]}</span><span>${esc(o)}</span></button>`).join("")}</div></div>`).join("");
+  const paint=()=> app.querySelectorAll("#qs .opt").forEach(b=> b.classList.toggle("picked", Q.ans[+b.dataset.q]===+b.dataset.j));
+  paint();
+  app.querySelectorAll("#qs .opt").forEach(b=> b.onclick=()=>{ if(submitted) return; Q.ans[+b.dataset.q]=+b.dataset.j; paint(); save(); });
+  $("#key").onclick=()=>{
+    if(!submitted) Q.keyEarly=true; save();
+    $("#keybox").innerHTML = `<div class="key">${QUIZ.map((q,i)=>`${i+1}. ${esc(pick(q.o)[q.a])}`).join("<br>")}</div>`;
+  };
+  const tick=()=>{ left--; $("#tm").style.width=(left/45*100)+"%"; if(left<=0){ clearInterval(timer); submit(); } };
+  timer=setInterval(tick,1000);
+  const submit=()=>{
+    if(submitted) return; submitted=true; clearInterval(timer);
+    $("#sub").disabled=true;
+    app.querySelectorAll("#qs .opt").forEach(b=>b.disabled=true);
+    $("#after").innerHTML = `<div class="conseq">
+      <div class="setgroup"><span>Did you use the answer key before submitting?</span><div class="seg" id="usedk">
+        <button data-v="no" aria-pressed="false"><b>No</b></button><button data-v="yes" aria-pressed="false"><b>Yes</b></button></div></div>
+      <div class="setgroup"><span>How many did you get right?</span><div class="seg" id="cl">${[0,1,2,3].map(n=>`<button data-v="${n}" aria-pressed="false"><b>${n}</b></button>`).join("")}</div></div>
+      <div class="row"><button class="btn" id="n" disabled>Record and continue</button></div></div>`;
+    let used=null, claim=null;
+    const seg=(id,cb)=> app.querySelectorAll(`#${id} button`).forEach(b=> b.onclick=()=>{ app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed",x===b)); cb(b.dataset.v); $("#n").disabled = used==null||claim==null; });
+    seg("usedk",v=>used=v); seg("cl",v=>claim=+v);
+    $("#n").onclick=()=>{
+      Q.saidUsed = used==="yes"; Q.claim=claim; Q.correct=QUIZ.reduce((s,q,i)=>s+(Q.ans[i]===q.a?1:0),0); Q.done=true;
+      S.tal += claim*5; save(); rail(); next();
+    };
+  };
+  $("#sub").onclick=submit;
+}
+
+function caseStep(app, st){
+  const C=CASES[st.id]; const rec=S.cases[st.id] || {seen:1};
+  S.cases[st.id]=rec;
+  const draw=()=>{
+    const cards = C.cards.slice(0,rec.seen).map((c,i)=>`<div class="ev"><i>${i+1}/4</i><span>${esc(c)}</span></div>`).join("");
+    const decided = rec.verdict!=null;
+    app.innerHTML = `<div class="card">
+      <div class="eyebrow">Gate ${gateOf(S.step)} · The Discernment</div>
+      <h2>Judge the integrity of ${T(C.who)}</h2>
+      <p>Evidence arrives one piece at a time. Judge whenever you’re ready, or keep looking.</p>
+      <div class="evid">${cards}</div>
+      ${decided ? "" : `
+      <label class="field" for="cf">How sure are you?<input type="range" id="cf" min="50" max="100" value="${rec.conf||70}"><div class="scale"><span>50% · A guess</span><b id="cfv">${rec.conf||70}%</b><span>100% · Certain</span></div></label>
+      <div class="row"><button class="btn" data-v="1">Has integrity</button><button class="btn" data-v="0">Lacks integrity</button>
+      ${rec.seen<4?`<button class="btn ghost" data-v="more">Keep looking</button>`:""}</div>`}
+      <div id="after"></div></div>`;
+    if(!decided){
+      $("#cf").oninput=e=>{ rec.conf=+e.target.value; $("#cfv").textContent=rec.conf+"%"; };
+      app.querySelectorAll("[data-v]").forEach(b=> b.onclick=()=>{
+        if(b.dataset.v==="more"){ rec.seen++; save(); draw(); return; }
+        rec.verdict = b.dataset.v==="1"; rec.conf = +$("#cf").value; save(); draw();
+      });
+    } else reveal();
+  };
+  const reveal=()=>{
+    const right = rec.verdict===C.truth;
+    const sc = caseScore(st.id);
+    const remaining = C.cards.slice(rec.seen).map((c,i)=>`<div class="ev"><i>${rec.seen+i+1}/4</i><span>${esc(c)}</span></div>`).join("");
+    $("#after").innerHTML = `${remaining?`<p class="note">The evidence you didn’t wait for:</p><div class="evid">${remaining}</div>`:""}
+      <div class="truth"><b>What was really going on</b><p>${esc(C.reveal)}</p>
+      ${S.exam?"":`<p><b>${right?"You read it right":"You read it wrong"}</b> after ${rec.seen} of 4 pieces of evidence, at ${rec.conf}% confidence. Discernment: ${sc}.</p>`}</div>
+      <p>${S.lens==="f"?esc(C.lesson):esc(C.lesson.replace(/^Job’s three friends[^.]*\. They were wrong, and confident\. /,"Confident judges are often wrong. "))}</p>
+      <div class="setgroup"><span>The four tells of real integrity</span><div class="tells">
+        <div><b>Same in the dark</b>Consistent seen and unseen.</div>
+        <div><b>Promises kept</b>Especially when keeping them costs.</div>
+        <div><b>The powerless</b>How they treat people who can’t repay.</div>
+        <div><b>When caught</b>Owning it instead of hiding it.</div></div></div>
+      <div class="row"><button class="btn" id="n">Continue</button></div>`;
+    $("#n").onclick=next;
+  };
+  draw();
+}
+function caseScore(id){
+  const C=CASES[id], r=S.cases[id]; if(!r || r.verdict==null) return null;
+  return r.verdict===C.truth ? Math.round(60+10*r.seen) : Math.round(clamp(40-(r.conf-50)*0.8));
+}
+
+function echo(app){
+  if(!S.flags.errHidden){ next(); return; }
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">An echo from Gate 1</div>
+    <h2>It came back</h2>
+    <p class="scene">${esc(S.set==="y" ? "A classmate compared papers and spotted the wrong mark. Now the story isn’t the mark. It’s that you kept it." : "The auditors found the figure in the board report. The question in the room isn’t about the mistake any more. It’s “Who knew?”")}</p>
+    <p class="note">Choices ripple. What you leave hidden at one gate tends to meet you at another.</p>
+    <div class="row"><button class="btn" id="n">Continue</button></div></div>`;
+  $("#n").onclick=next;
+}
+
+function road(app){
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">Leaving the Vault</div>
+    <h2>Two roads</h2>
+    <p class="scene">Two roads lead out of the Vault toward the Summit. <b>The Golden Road</b> is paved and quick, and every traveller on it receives 20 talents. <b>The Market Lane</b> is crowded and slow, and pays nothing.</p>
+    <div class="opts" id="o">
+      <button class="opt" data-v="gold"><span class="k">A</span><span>Take the Golden Road (+20 talents)</span></button>
+      <button class="opt" data-v="market"><span class="k">B</span><span>Take the Market Lane</span></button></div>
+    <div id="after"></div></div>`;
+  const choose=(v)=>{
+    app.querySelectorAll(".opt").forEach(x=>{ x.disabled=true; x.classList.toggle("picked",x.dataset.v===v); });
+    if(!S.road){ S.road=v; if(v==="gold") S.tal+=20; save(); rail(); }
+    let msg;
+    if(v==="market") msg = S.promise==="no" ? "Halfway down the lane, an old woman is struggling with a basket. It’s Mara. “You came anyway,” she says, and lets you carry it." : "Halfway down the lane, Mara is sitting beside her basket. She looks up. “You remembered.”";
+    else msg = "The Golden Road is smooth and fast. The talents are already in your purse.";
+    $("#after").innerHTML = `<div class="conseq"><p>${esc(msg)}</p><div class="row"><button class="btn" id="n">Continue</button></div></div>`;
+    $("#n").onclick=next;
+  };
+  app.querySelectorAll(".opt").forEach(b=> b.onclick=()=>choose(b.dataset.v));
+  if(S.road) choose(S.road);
+}
+
+function gateEnd(app, st){
+  const ids = Object.keys(SCN).filter(id=>SCN[id].gate===st.g && S.ans[id]!=null);
+  const tot={}; ids.forEach(id=>{ const d=optsOf(id)[S.ans[id]].d; for(const k in d) tot[k]=(tot[k]||0)+d[k]; });
+  const last = st.g===7;
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">Gate ${st.g} complete</div>
+    <h2>${esc(GATES[st.g].name)}, behind you</h2>
+    <div class="ask"><b>${esc(guide())}</b><p id="gl">${T(GATE_END[st.g])}</p></div>
+    ${S.exam||!ids.length?"":`<div class="chips">${chipsFor(tot)}</div>`}
+    <div class="row">${S.exam?"":`<button class="btn ghost small" id="deep">Ask ${esc(guide())} for a deeper reading</button>`}<button class="btn brass" id="n">${last?"Open the Book of Your Life":"On to Gate "+(st.g+1)}</button></div></div>`;
+  $("#n").onclick=next;
+  const d=$("#deep"); if(d) d.onclick=async()=>{
+    d.disabled=true; const p=$("#gl"); p.classList.add("loading"); const orig=p.textContent;
+    const log = ids.map(id=>`Scene: ${pick(SCN[id].text).slice(0,180)} → Chose: ${pick(optsOf(id)[S.ans[id]].t)}${S.why[id]?" (reason given: "+S.why[id]+")":""}`).join("\n");
+    try{
+      const t = await ai("gate", {gate:GATES[st.g].name, elements:pick(GATES[st.g].els), log:log||"(no scored choices at this gate)"});
+      p.classList.remove("loading"); p.textContent=t||orig;
+    }catch(e){ p.classList.remove("loading"); p.textContent=orig; toast(`${guide()} is unavailable here. The written reflection stands.`); }
+  };
+}
+
+/* ---------------- Scoring ---------------- */
+function score(){
+  // Elements
+  const acc={}; for(const k in ELS) acc[k]={c:0,mn:0,mx:0};
+  for(const id in S.ans){
+    const opts=optsOf(id); const keys=new Set(); opts.forEach(o=>Object.keys(o.d).forEach(k=>keys.add(k)));
+    keys.forEach(k=>{ const vals=opts.map(o=>o.d[k]||0); acc[k].mn+=Math.min(...vals); acc[k].mx+=Math.max(...vals); acc[k].c+=opts[S.ans[id]].d[k]||0; });
+  }
+  const els={}; for(const k in acc){ const a=acc[k]; els[k]= a.mx>a.mn ? Math.round((a.c-a.mn)/(a.mx-a.mn)*100) : null; }
+  const elVals=Object.values(els).filter(v=>v!=null);
+  const choices = elVals.length ? Math.round(elVals.reduce((s,v)=>s+v,0)/elVals.length) : 0;
+
+  // Mirror 1: seen vs unseen
+  const pairs=[["change","checkout"],["creditSeen","creditAlone"]];
+  const pd = pairs.filter(([a,b])=>S.ans[a]!=null&&S.ans[b]!=null).map(([a,b])=>{ const vs=optsOf(a)[S.ans[a]].v, vu=optsOf(b)[S.ans[b]].v; return {a,b,vs,vu,gap:Math.max(0,vs-vu)}; });
+  const seen = pd.length ? Math.round(100 - pd.reduce((s,p)=>s+p.gap,0)/pd.length*100) : 100;
+
+  // Mirror 2: say vs do
+  let say=100; const notes=[];
+  const Q=S.quiz;
+  if(Q && Q.done){
+    if(Q.keyEarly && !Q.saidUsed){ say-=50; notes.push("You opened the answer key before submitting, then reported that you hadn’t."); }
+    else if(Q.keyEarly && Q.saidUsed){ notes.push("You opened the answer key early and said so. That honesty counts."); }
+    if(Q.claim>Q.correct){ const pen = Q.keyEarly ? 20 : 8; say-=pen; notes.push(`You scored yourself ${Q.claim}/3; your answers had ${Q.correct}/3 right${Q.keyEarly?" (and you had seen the key)":""}.`); }
+    if(!Q.keyEarly && Q.claim<=Q.correct) notes.push(`Quiz: you answered from memory and scored yourself honestly (${Q.claim} claimed, ${Q.correct} right).`);
+  }
+  const hon = els.hon ?? 50;
+  const selfGap = S.selfHonest*10 - hon;
+  if(selfGap>20){ const pen=Math.min(30,selfGap-20); say-=pen; notes.push(`You rated your honesty ${S.selfHonest}/10 before the quest; your honesty choices came out at ${hon}%.`); }
+  else if(selfGap< -20) notes.push(`You rated your honesty ${S.selfHonest}/10, lower than your choices showed (${hon}%). You may be harder on yourself than you need to be.`);
+  else notes.push(`Your opening self-rating (${S.selfHonest}/10) matched your honesty choices (${hon}%) closely.`);
+  say=clamp(Math.round(say));
+
+  // Mirror 3: self vs other
+  const pl=[["p1o","p1s"],["p2o","p2s"]].filter(([o,s])=>S.planks[o]!=null&&S.planks[s]!=null).map(([o,s])=>({o:S.planks[o],s:S.planks[s]}));
+  const gapAvg = pl.length ? pl.reduce((t,p)=>t+(p.o-p.s),0)/pl.length : 0;
+  const plank = Math.round(clamp(100 - Math.max(0,gapAvg)*12.5));
+
+  // Mirror 4: fidelity
+  const fid = {yes:{market:100,gold:0},no:{market:90,gold:80},maybe:{market:85,gold:45}}[S.promise||"no"][S.road||"gold"];
+
+  const whole = Math.round((seen+say+plank+fid)/4);
+  const cs=["femi","bayo"].map(caseScore).filter(v=>v!=null);
+  const disc = cs.length ? Math.round(cs.reduce((s,v)=>s+v,0)/cs.length) : 0;
+  const iq = Math.round(0.45*choices + 0.40*whole + 0.15*disc);
+  const rank = RANKS.find(r=>iq>=r[0]);
+
+  // coins
+  let coins=null;
+  const real=S.coins.filter(c=>c && !c.digital && !c.council);
+  if(S.mode==="council"){
+    const cc=S.coins.filter(c=>c&&c.council); const p=cc.reduce((s,c)=>s+c.p,0), h=cc.reduce((s,c)=>s+c.h,0);
+    coins={council:true,p,h,prob:tail(p,h)};
+  } else if(real.length){ const h=real.filter(c=>c.r==="H").length; coins={n:real.length,h,prob:tail(real.length,h)}; }
+
+  const sorted = Object.entries(els).filter(([,v])=>v!=null).sort((a,b)=>a[1]-b[1]);
+  return {els,choices,seen,pd,say,notes,plank,pl,gapAvg,fid,whole,disc,iq,rank,coins,weak:sorted.slice(0,3).map(x=>x[0]),strong:sorted.slice(-2).reverse().map(x=>x[0])};
+}
+function tail(n,h){ // P(X>=h), X~Bin(n,.5)
+  if(n>200){ const m=n/2, sd=Math.sqrt(n)/2; const z=(h-0.5-m)/sd; return 0.5*erfc(z/Math.SQRT2); }
+  let p=0; for(let k=h;k<=n;k++) p+=comb(n,k); return p/Math.pow(2,n);
+}
+function comb(n,k){ let r=1; for(let i=1;i<=k;i++) r=r*(n-k+i)/i; return r; }
+function erfc(x){ const t=1/(1+0.5*Math.abs(x)); const y=t*Math.exp(-x*x-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+t*(-0.82215223+t*0.17087277))))))))); return x>=0?y:2-y; }
+
+/* ---------------- Final ---------------- */
+function plumbSVG(whole){
+  const tilt = ((100-whole)/100*22).toFixed(1);
+  return `<svg viewBox="0 0 160 210" role="img" aria-label="Plumb line tilted ${tilt} degrees from true">
+    <line x1="80" y1="6" x2="80" y2="204" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 4"/>
+    <rect x="40" y="0" width="80" height="6" fill="var(--ink)"/>
+    <g class="swing" style="--tilt:${tilt}deg">
+      <line x1="80" y1="6" x2="80" y2="170" stroke="var(--brass)" stroke-width="1.5"/>
+      <path d="M70 170 L90 170 L80 198 Z" fill="var(--brass)"/>
+    </g>
+    <text x="80" y="208" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--muted)">TRUE</text>
+  </svg>`;
+}
+
+function final(app){
+  const R=score();
+  const council=S.mode==="council";
+  const who = S.name || (council?"The Council":"Traveller");
+  const pdText = R.pd.map(p=>{
+    const nm = p.a==="change" ? "Wrong change with people watching, then the unscanned item alone" : "Credit for Tolu’s idea in front of others, then alone with the slides";
+    return `${nm}: ${p.vs>p.vu?"<b>you did better when watched</b>":(p.vs<p.vu?"you did better alone":"the same person both times")}.`;
+  }).join(" ");
+  const pl = R.pl.length ? (R.gapAvg>0.5 ? `You rated others’ wrongs ${R.gapAvg.toFixed(1)} points more serious than the same wrongs done by you.` : (R.gapAvg<-0.5 ? `You judged yourself ${Math.abs(R.gapAvg).toFixed(1)} points more harshly than others. Fair, but watch for self-condemnation.` : "You used the same scale for yourself as for others.")) : "";
+  const fidText = {yes:{market:"You promised Mara, and with no reminder you took the Market Lane. Promise kept.",gold:"You promised Mara, then took the Golden Road for 20 talents. She waited."},
+    no:{market:"You honestly declined Mara’s request, and still took the Market Lane. Kindness without obligation.",gold:"You honestly declined, and took the Golden Road. An honest no kept its word."},
+    maybe:{market:"You said “maybe” and showed up. A soft promise, kept.",gold:"You said “maybe”, and the maybe became a no without a word."}}[S.promise||"no"][S.road||"gold"];
+  let coinText="";
+  if(R.coins){
+    if(R.coins.council) coinText = `The room flipped ${R.coins.p} coins and reported ${R.coins.h} heads. A room of perfectly honest flippers reports about ${Math.round(R.coins.p/2)}. The chance of ${R.coins.h} or more heads by luck alone is ${(R.coins.prob*100).toFixed(R.coins.prob<0.01?2:0)}%. No one in the room is exposed by this. The room as a whole just learned something about itself.`;
+    else coinText = `You reported ${R.coins.h} head${R.coins.h===1?"":"s"} from ${R.coins.n} real flip${R.coins.n===1?"":"s"}. The chance of ${R.coins.h} or more by luck is ${Math.round(R.coins.prob*100)}%. The quest cannot know which flips were real. Only you know. That is the point: most of integrity happens where no score can reach.`;
+  } else coinText = "You let the quest flip for you each time, so nothing was measured here.";
+
+  const bars = Object.keys(ELS).map(k=>{ const v=R.els[k]; return `<div class="bar ${v!=null&&v<50?"low":""}"><span>${esc(elName(k))}</span><div class="tr"><i style="width:${v??0}%"></i></div><em>${v==null?"—":v+"%"}</em></div>`; }).join("");
+
+  app.innerHTML = `<div class="card">
+    <div class="eyebrow">The Book of Your Life · ${esc(who)}</div>
+    <div class="verdict">
+      <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+        <div class="iq">${R.iq}<small>INTEGRITY QUOTIENT</small></div>
+        <h2>${T(R.rank[1])}</h2><p class="lede">${esc(R.rank[2])}</p>
+      </div>
+      <div class="plumb">${plumbSVG(R.whole)}</div>
+    </div>
+    <div class="trio">
+      <div><span>Choices · what you chose</span><b>${R.choices}</b><span>45% of IQ</span></div>
+      <div><span>Wholeness · the four mirrors</span><b>${R.whole}</b><span>40% of IQ</span></div>
+      <div><span>Discernment · judging others</span><b>${R.disc}</b><span>15% of IQ</span></div>
+    </div>
+    <p class="note">The plumb line hangs true when you are the same person in every mirror. The further it leans, the more divided the picture.</p>
+
+    <h3>The four mirrors, revealed</h3>
+    <div class="mirrors">
+      <div class="mirror"><div class="top"><span><b style="font-family:var(--body);font-size:16px">Seen · Unseen</b></span><b>${R.seen}</b></div><p>Two scenes appeared twice: once with people watching, once alone. ${pdText}</p></div>
+      <div class="mirror"><div class="top"><span><b style="font-family:var(--body);font-size:16px">Say · Do</b></span><b>${R.say}</b></div><p>${R.notes.map(esc).join(" ")}</p></div>
+      <div class="mirror"><div class="top"><span><b style="font-family:var(--body);font-size:16px">Others · Self</b></span><b>${R.plank}</b></div><p>Two wrongs were shown twice: once done by someone else, later done by you. ${esc(pl)}</p></div>
+      <div class="mirror"><div class="top"><span><b style="font-family:var(--body);font-size:16px">Promise · Path</b></span><b>${R.fid}</b></div><p>${esc(fidText)} This is fidelity, the foundation of the Integrity Quotient.</p></div>
+    </div>
+    <div class="conseq"><b>The Honest Coin</b><p>${esc(coinText)}</p></div>
+
+    <h3>The eleven elements</h3>
+    <div class="bars">${bars}<div class="bar found"><span>Fidelity (foundation)</span><div class="tr"><i style="width:${R.fid}%"></i></div><em>${R.fid}%</em></div></div>
+
+    <div class="book" id="book"><p class="loading">${esc(guide())} is writing your book…</p></div>
+
+    <div class="ask"><b>${esc(guide())}’s Trial</b><p>One more scene, written just for you, on your growing edge: ${esc(elName(R.weak[0]||"hon"))}.</p><div id="trial"><button class="btn ghost small" id="trialbtn">Face the Trial</button></div></div>
+
+    ${backendReady()?deeperPanel(R):""}
+
+    <div class="row"><button class="btn" id="copy">Copy summary for an accountability partner</button><button class="btn ghost" id="again">Play again</button></div>
+    <p class="note">Undivided is a reflection tool, not a validated psychological test. Don’t use these results for hiring, grading, discipline or church office. Talents were worth nothing. What you did with them was worth noticing.</p>
+  </div>`;
+
+  $("#copy").onclick=()=>{
+    const txt = `UNDIVIDED · The Integrity Quest\n${who} · IQ ${R.iq} (${pick(R.rank[1])})\nChoices ${R.choices} · Wholeness ${R.whole} · Discernment ${R.disc}\nStrongest: ${R.strong.map(elName).join(", ")}\nGrowing edge: ${R.weak.map(elName).join(", ")}\nMirrors: Seen/Unseen ${R.seen}, Say/Do ${R.say}, Others/Self ${R.plank}, Promise/Path ${R.fid}` + (S.book&&S.book.commission?`\nCommission: ${S.book.commission}`:"");
+    const done=()=>toast("Summary copied");
+    try{ navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt)); }catch(e){ fallbackCopy(txt); }
+  };
+  $("#again").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} const keep={name:S.name,lens:S.lens,set:S.set,mode:S.mode,exam:S.exam,cohort:S.cohort}; S=Object.assign(FRESH(),keep); S.step=-1; render(); };
+  $("#trialbtn").onclick=()=>trial(R);
+  if(backendReady()) wireDeeper(R);
+  writeBook(R);
+}
+
+/* ---------------- Saving and the portfolio link ---------------- */
+// Rough mapping of Job 31 elements onto the Jude 1:11 fires (The Three Fires programme).
+const FIRES = {
+  cain:{name:"Cain", desc:"resentment of other people’s standing, and the anger that follows", els:["mercy","fair","char"]},
+  balaam:{name:"Balaam", desc:"integrity for hire: letting gain set the price of truth", els:["cont","hon","just"]},
+  korah:{name:"Korah", desc:"grasping for position and resisting accountability", els:["pow","trans","opp"]}
+};
+function fireFor(R){
+  let best=null;
+  for(const k in FIRES){ const v=FIRES[k].els.map(e=>R.els[e]).filter(x=>x!=null); if(!v.length) continue;
+    const m=v.reduce((s,x)=>s+x,0)/v.length; if(!best||m<best.m) best={k,m}; }
+  return best ? FIRES[best.k] : FIRES.balaam;
+}
+function runPayload(R, link){
+  return {
+    cohort_code: S.cohort ? S.cohort.code : null, lens:S.lens, setting:S.set, mode:S.mode, exam:!!S.exam,
+    iq:R.iq, choices:R.choices, wholeness:R.whole, discernment:R.disc,
+    mirrors:{seen_unseen:R.seen, say_do:R.say, others_self:R.plank, promise_path:R.fid},
+    elements:Object.fromEntries(Object.entries(R.els).filter(([,v])=>v!=null)),
+    events:{ans:S.ans, planks:S.planks, self_honest:S.selfHonest, promise:S.promise, road:S.road,
+      quiz:S.quiz?{key_early:!!S.quiz.keyEarly, said_used:!!S.quiz.saidUsed, claim:S.quiz.claim, correct:S.quiz.correct}:null,
+      cases:Object.fromEntries(Object.entries(S.cases).map(([k,v])=>[k,{seen:v.seen,verdict:v.verdict,conf:v.conf}])),
+      coins:R.coins ? (R.coins.council?{n:R.coins.p,h:R.coins.h,council:true}:{n:R.coins.n,h:R.coins.h}) : null},
+    research_consent:!!S.research, link_consent:!!link
+  };
+}
+async function submitRun(R, link){
+  if(S.run) return S.run;
+  const out = await rpc("ud_submit_run",{p:runPayload(R, link)});
+  S.run = {id:out.id, token:out.token, link_code:out.link_code||null}; save();
+  return S.run;
+}
+async function ensureLink(R){
+  if(S.run && S.run.link_code) return S.run.link_code;
+  if(!S.run){ await submitRun(R, true); return S.run.link_code; }
+  const code = await rpc("ud_enable_link",{p_id:S.run.id, p_token:S.run.token});
+  S.run.link_code = code; save(); return code;
+}
+function deeperPanel(R){
+  const f=fireFor(R);
+  return `<div class="conseq" id="deeper">
+    <b>Go deeper</b>
+    <p>Your clearest growing edge looks most like the way of <b>${esc(f.name)}</b> in Jude 1:11: ${esc(f.desc)}. <span class="note">(A rough mapping, not a diagnosis.)</span></p>
+    <div class="row">
+      <a class="btn" id="lk-ic" href="${esc(CFG.commonsUrl||"#")}" target="_blank" rel="noopener">Take the full Integrity Profile</a>
+      <a class="btn ghost" id="lk-tf" href="${esc(CFG.threeFiresUrl||"#")}" target="_blank" rel="noopener">Explore The Three Fires</a>
+    </div>
+    <label class="row" style="gap:8px;font-size:15px;align-items:flex-start"><input type="checkbox" id="carry" ${S.run&&S.run.link_code?"checked":""} style="margin-top:5px"> <span>Carry my scores with me (scores only, never what I wrote). The link code expires in 30 days.</span></label>
+    <p class="note" id="savemsg"></p>
+  </div>`;
+}
+function wireDeeper(R){
+  const msg=$("#savemsg");
+  const setLinks=(code)=>{
+    const add=(u)=> u ? u + (u.includes("?")?"&":"?") + "ud=" + encodeURIComponent(code) : "#";
+    if(code){ $("#lk-ic").href=add(CFG.commonsUrl); $("#lk-tf").href=add(CFG.threeFiresUrl); msg.textContent=`Your link code is ${code}. Both buttons now carry it.`; }
+    else { $("#lk-ic").href=CFG.commonsUrl||"#"; $("#lk-tf").href=CFG.threeFiresUrl||"#"; }
+  };
+  if(S.run && S.run.link_code) setLinks(S.run.link_code);
+  else if((S.cohort||S.research) && !S.run){
+    submitRun(R,false).then(()=>{ msg.textContent = S.cohort ? `Saved to the totals for ${S.cohort.name}.` : "Saved anonymously for research. Thank you."; })
+      .catch(()=>{ msg.textContent="Couldn’t save to the server. Your results are still on this device."; });
+  }
+  $("#carry").onchange=async(e)=>{
+    if(!e.target.checked){ setLinks(null); msg.textContent="Links will open without your scores."; return; }
+    msg.textContent="Creating your link code…";
+    try{ setLinks(await ensureLink(R)); }
+    catch(err){ e.target.checked=false; msg.textContent="Couldn’t create a link code right now. Try again in a moment."; }
+  };
+}
+function fallbackCopy(txt){
+  const ta=document.createElement("textarea"); ta.value=txt; ta.setAttribute("readonly",""); ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta); ta.select();
+  let ok=false; try{ ok=document.execCommand("copy"); }catch(e){} ta.remove(); toast(ok?"Summary copied":"Copy isn’t allowed here. Select the scores by hand.");
+}
+
+function fallbackBook(R){
+  const w=R.weak.map(elName), s=R.strong.map(elName);
+  const faith=S.lens==="f";
+  return {
+    defense: faith
+      ? `If I have walked with honesty, let the scales show it.\nIf I have kept my word when no one reminded me, let it be written.\nIf I have been one person in the light and another in the dark, let me see it plainly.\nI sign my name to this account, ${S.name||"traveller"}, and I am not finished yet.`
+      : `This is my account. Where I was strong: ${s.join(" and ")}.\nWhere I was divided: ${w.slice(0,2).join(" and ")}.\nI sign it as a starting point, not a verdict.`,
+    verdict: `You showed real strength in ${s.join(" and ")}. Your growing edge is ${w[0]}${w[1]?", with "+w[1]+" close behind":""}. ${R.whole>=80?"Your mirrors mostly agreed: the person watched and the person alone look alike.":"Your mirrors didn’t all agree, and that gap is the most useful thing this quest can show you."}`,
+    commission: faith ? "Go and live undivided. Someone is always watching, and that isn’t a threat. It’s a promise." : "Go and be the same person everywhere. That is the whole of it.",
+    missions: R.weak.slice(0,3).map(k=>({element:elName(k),task:pick(MISSIONS[k])})),
+    question: "Where in your life this week will you be most tempted to be two people?"
+  };
+}
+function paintBook(b){
+  const faith=S.lens==="f";
+  $("#book").innerHTML = `
+    <div class="eyebrow">${faith?"Your defense · after Job 31":"Your account"}</div>
+    <div class="defense">${esc(b.defense)}</div>
+    <div class="eyebrow">The verdict, which is not a judgment</div><p>${esc(b.verdict)}</p>
+    <div class="eyebrow">The commission</div><p>${esc(b.commission)}</p>
+    <div class="eyebrow">Seven-day missions</div>
+    <div class="missions">${(b.missions||[]).slice(0,3).map(m=>`<div><b>${esc(m.element)}</b>${esc(m.task)}</div>`).join("")}</div>
+    ${b.question?`<div class="ask"><b>A question to sit with</b><p>${esc(b.question)}</p></div>`:""}`;
+}
+async function writeBook(R){
+  if(S.book){ paintBook(S.book); return; }
+  const log = Object.keys(S.ans).map(id=>`- ${pick(SCN[id].text).slice(0,140)}… → ${pick(optsOf(id)[S.ans[id]].t)}${S.why[id]?" | why: "+S.why[id].slice(0,200):""}`).join("\n");
+  const data = {name:S.name||"the player", iq:R.iq, rank:pick(R.rank[1]), choices:R.choices, wholeness:R.whole, discernment:R.disc,
+    elements:Object.entries(R.els).filter(([,v])=>v!=null).map(([k,v])=>elName(k)+" "+v).join(", "),
+    mirrors:`Seen/Unseen ${R.seen}; Say/Do ${R.say} (${R.notes.join(" ")}); Others/Self ${R.plank} (gap ${R.gapAvg.toFixed(1)}); Promise/Path ${R.fid} (promise: ${S.promise}, road: ${S.road})`,
+    weakest:R.weak.map(elName).join(", "), log};
+  try{
+    const b = await ai("book", data);
+    if(!b || !b.defense || !b.verdict) throw new Error("bad");
+    S.book=b; save(); paintBook(b);
+  }catch(e){ S.book=fallbackBook(R); save(); paintBook(S.book); }
+}
+
+async function trial(R){
+  const box=$("#trial"); const weak=R.weak[0]||"hon";
+  box.innerHTML = `<p class="loading">${esc(guide())} is writing a scene for you…</p>`;
+  let t=S.trial;
+  if(!t){
+    try{
+      t = await ai("trial", {element:elName(weak), weakest:R.weak.map(elName).join(", ")});
+      if(!t || !t.scene || !Array.isArray(t.options) || t.options.length<2) throw new Error("bad");
+      S.trial=t; save();
+    }catch(e){
+      box.innerHTML = `<p>${esc(guide())} can’t write a new scene here, so take this one into real life instead:</p><p><b>${esc(elName(weak))}:</b> ${esc(pick(MISSIONS[weak]))}</p>`;
+      return;
+    }
+  }
+  box.innerHTML = `<h3>${esc(t.title||"Your Trial")}</h3><p class="scene">${esc(t.scene)}</p>
+    <div class="opts">${t.options.map((o,i)=>`<button class="opt" data-i="${i}"><span class="k">${"ABCDE"[i]}</span><span>${esc(o.text)}</span></button>`).join("")}</div><div id="tout"></div>`;
+  box.querySelectorAll(".opt").forEach(b=> b.onclick=()=>{
+    const o=t.options[+b.dataset.i];
+    box.querySelectorAll(".opt").forEach(x=>{ x.disabled=true; x.classList.toggle("picked",x===b); });
+    const lv = +o.integrity;
+    $("#tout").innerHTML = `<div class="conseq"><p>${esc(o.consequence||"")}</p><p><b>${lv>=2?"That’s growth on your edge.":lv===1?"Partway there. What would the full step have cost?":"The same pull you met in the quest. Notice it; that is where the work is."}</b></p></div>`;
+  });
+}
+
+/* ---------------- Boot ---------------- */
+function boot(data){
+  const saved = data && data.S ? data.S : null;
+  if(saved && saved.v===1) S=saved;
+  render();
+}
+try{ window.claude?.hot?.snapshot?.(()=>({S})); }catch(e){}
+(window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {}));
+</script>
+</body></html>
