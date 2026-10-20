@@ -6,6 +6,7 @@
 <title>Undivided Leaders</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <script src="config.js"></script>
+<script src="industries.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
 :root{--bg:#ECEFE9;--surface:#F9FAF6;--sunk:#E2E6DF;--ink:#1B2320;--muted:#59645F;--rule:#C9D0C8;--brass:#9A6A14;--brass-soft:#E9D9B6;--verd:#1E5C57;--verd-soft:#D4E6E2;--clay:#A9481F;
@@ -68,6 +69,11 @@ th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:up
         <label for="gs">Setting<select id="gs"><option value="">Player chooses</option><option value="a">Life &amp; Work</option><option value="y">School (12–18)</option></select></label>
         <label for="glv">Level<select id="glv"><option value="">Player chooses</option><option value="1">1 · Seeker</option><option value="2">2 · Steward</option><option value="3">3 · Sage</option></select></label>
       </div>
+      <div class="row">
+        <label for="gi">Industry pack<select id="gi"></select></label>
+        <label for="gc">Country (optional)<input id="gc" maxlength="40" placeholder="e.g. Nigeria, United States"></label>
+      </div>
+      <p class="note">The industry pack writes every scene for your line of work. Principles and scoring never change. After creating the group you can add your organisation’s own code of conduct.</p>
       <div class="row"><button class="btn" id="mk">Create group</button><span class="note" id="mkmsg"></span></div>
     </div>
 
@@ -75,6 +81,8 @@ th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:up
       <h2>Your groups</h2>
       <div class="scroll"><table><thead><tr><th>Group</th><th>Code</th><th>Players</th><th></th></tr></thead><tbody id="list"><tr><td colspan="4" class="note">Loading…</td></tr></tbody></table></div>
     </div>
+
+    <div class="card" id="codebox" hidden></div>
 
     <div class="card" id="sum" hidden></div>
   </div>
@@ -88,6 +96,7 @@ const CFG = window.UNDIVIDED_CONFIG || {};
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const EL = {hon:"Honesty",chas:"Faithfulness & Boundaries",fair:"Fairness & Equity",char:"Charity / Compassion",fam:"Family",pow:"Use of Power",cont:"Contentment",mercy:"Mercy",trans:"Transparency",opp:"Second Chances",just:"Justice & Stewardship"};
+const INDS = window.INDUSTRIES || {}, IORDER = window.INDUSTRY_ORDER || Object.keys(INDS);
 const MIRRORS = {seen_unseen:"Seen · Unseen",say_do:"Say · Do",others_self:"Others · Self",promise_path:"Promise · Path"};
 // What each option MEANS (its archetype). Scenes are rewritten every play and options are shuffled, so results are grouped by meaning, not by letter.
 const ARCH = {
@@ -127,13 +136,15 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
   };
   $("#out").onclick = () => sb.auth.signOut();
 
+  $("#gi").innerHTML = `<option value="">None (players choose)</option>` + IORDER.filter(k=>k!=="general").map(k=>`<option value="${k}">${esc(INDS[k].name)}</option>`).join("");
+  $("#gi").onchange = () => { const k=$("#gi").value; if(k==="students"){ $("#gs").value="y"; $("#gk").value="school"; } else if(k==="ministry"){ $("#gk").value="church"; } else if(k && k!=="education"){ $("#gk").value="workplace"; if($("#gs").value==="y") $("#gs").value="a"; } };
   $("#mk").onclick = async () => {
     const name = $("#gn").value.trim(); if(name.length < 2){ $("#mkmsg").textContent = "Give the group a name first."; return; }
     $("#mk").disabled = true;
-    const { data, error } = await sb.rpc("ud_create_cohort", { p_name:name, p_kind:$("#gk").value, p_lens:$("#gl").value || null, p_setting:$("#gs").value || null, p_level:$("#glv").value ? +$("#glv").value : null });
+    const { data, error } = await sb.rpc("ud_create_cohort", { p_name:name, p_kind:$("#gk").value, p_lens:$("#gl").value || null, p_setting:$("#gs").value || null, p_level:$("#glv").value ? +$("#glv").value : null, p_industry:$("#gi").value || null, p_country:$("#gc").value.trim() || null });
     $("#mk").disabled = false;
     if(error){ $("#mkmsg").textContent = "Couldn’t create the group: " + error.message; return; }
-    $("#mkmsg").innerHTML = `Created. Players enter code <span class="code">${esc(data.code)}</span> on the game’s start screen.`;
+    $("#mkmsg").innerHTML = `Created. Players enter code <span class="code">${esc(data.code)}</span> on the game’s start screen. Use “Code of conduct” in the list below to add your own rules.`;
     $("#gn").value = ""; loadList();
   };
 
@@ -141,12 +152,69 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
     const { data, error } = await sb.rpc("ud_my_cohorts");
     if(error){ $("#list").innerHTML = `<tr><td colspan="4">Couldn’t load groups: ${esc(error.message)}</td></tr>`; return; }
     if(!data.length){ $("#list").innerHTML = `<tr><td colspan="4" class="note">No groups yet. Create one above, then share its code.</td></tr>`; return; }
-    $("#list").innerHTML = data.map(c => `<tr><td>${esc(c.name)}<br><span class="note">${esc(c.kind)}${c.lens?" · "+(c.lens==="f"?"Faith":"Civic"):""}${c.setting?" · "+(c.setting==="y"?"School":"Life & Work"):""}${c.level?" · Level "+c.level:""}</span></td>
-      <td class="code">${esc(c.code)}</td><td>${c.players}</td><td><button class="btn ghost" data-id="${esc(c.id)}" data-name="${esc(c.name)}" data-set="${esc(c.setting||"")}">Results</button></td></tr>`).join("");
-    document.querySelectorAll("#list button").forEach(b => b.onclick = () => loadSummary(b.dataset.id, b.dataset.name, b.dataset.set));
+    $("#list").innerHTML = data.map(c => `<tr><td>${esc(c.name)}<br><span class="note">${esc(c.kind)}${c.lens?" · "+(c.lens==="f"?"Faith":"Civic"):""}${c.setting?" · "+(c.setting==="y"?"School":"Life & Work"):""}${c.level?" · Level "+c.level:""}${c.industry&&INDS[c.industry]?" · "+esc(INDS[c.industry].short):""}${c.country?" · "+esc(c.country):""}${c.has_code?" · <b>own code loaded</b>":""}</span></td>
+      <td class="code">${esc(c.code)}</td><td>${c.players}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost" data-act="sum" data-id="${esc(c.id)}" data-name="${esc(c.name)}" data-set="${esc(c.setting||"")}" data-kind="${esc(c.kind||"other")}" data-ind="${esc(c.industry||"")}">Results</button><button class="btn ghost" data-act="code" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Code of conduct</button></td></tr>`).join("");
+    document.querySelectorAll("#list button[data-act=sum]").forEach(b => b.onclick = () => loadSummary(b.dataset.id, b.dataset.name, b.dataset.set, b.dataset.kind, b.dataset.ind));
+    document.querySelectorAll("#list button[data-act=code]").forEach(b => b.onclick = () => openCode(b.dataset.id, b.dataset.name));
   }
 
-  async function loadSummary(id, name, setting){
+  // Bring your own code of conduct: private to this group. Players never see the text.
+  async function openCode(id, name){
+    const box = $("#codebox"); box.hidden = false; box.innerHTML = `<p class="note">Loading…</p>`;
+    const { data, error } = await sb.rpc("ud_get_cohort_code", { p_id:id });
+    if(error){ box.innerHTML = `<p>Couldn’t load: ${esc(error.message)}</p>`; return; }
+    const d = data || {};
+    box.innerHTML = `<div class="eyebrow">Bring your own code</div><h2>${esc(name)}: code of conduct</h2>
+      <p>Paste your organisation’s code of conduct, values statement or ethics policy (up to 20,000 characters; the most relevant sections are enough). The guide reads it privately and writes scenes that touch your real rules, in your own words. Players never see the text, and nothing they write is stored.</p>
+      <label for="ct" style="width:100%">Code of conduct<textarea id="ct" rows="12" maxlength="20000" style="width:100%;font:inherit;padding:10px;border-radius:6px;border:1px solid var(--line,#ccc)" placeholder="e.g. 1. Safety comes first: stop the line if anyone is at risk. 2. Report every near-miss within the shift. 3. Record your time honestly…">${esc(d.text||"")}</textarea></label>
+      <p class="note"><span id="cn">${(d.text||"").length}</span> / 20,000 characters${d.updated?" · last saved "+esc(new Date(d.updated).toLocaleString()):""}</p>
+      <div class="row"><button class="btn" id="csave">Save code</button><button class="btn ghost" id="cclear">Remove code</button><span class="note" id="cmsg"></span></div>
+      ${d.digest?`<h3>What the guide took from it</h3><pre style="white-space:pre-wrap;font:inherit;background:var(--brass-soft);padding:12px;border-radius:6px">${esc(d.digest)}</pre><p class="note">This summary is made the first time a player plays after you save. Check it reflects your code.</p>`:(d.text?`<p class="note">The guide will summarise it the first time a player plays. Come back here afterwards to check the summary.</p>`:"")}
+      <p class="note">Don’t paste anything confidential you wouldn’t share with your own staff. The text is stored in your Undivided database and sent to the AI model only to write scenes.</p>`;
+    $("#ct").oninput = () => { $("#cn").textContent = $("#ct").value.length; };
+    const save = async (txt) => {
+      $("#cmsg").textContent = "Saving…";
+      const { error } = await sb.rpc("ud_set_cohort_code", { p_id:id, p_text:txt });
+      $("#cmsg").textContent = error ? "Couldn’t save: " + error.message : (txt ? "Saved. New plays in this group will use it." : "Removed.");
+      if(!error){ loadList(); if(!txt) $("#ct").value = ""; }
+    };
+    $("#csave").onclick = () => save($("#ct").value.trim());
+    $("#cclear").onclick = () => { if(confirm("Remove this group’s code of conduct?")) save(""); };
+    box.scrollIntoView({behavior:"smooth"});
+  }
+
+  // Group Pathfinder: programme suggestions from group totals (never about individuals).
+  function groupPath(s, kind, ind){
+    const m=s.mirrors||{}, e=s.elements||{}, c=s.coins||{flips:0,heads:0};
+    const pack = ind && INDS[ind];
+    if(pack){ if(ind==="ministry") kind="church"; else if(ind==="students"||ind==="education") kind="school"; else kind="workplace"; }
+    const T = (church, work, school) => kind==="church" ? church : kind==="workplace" ? work : kind==="school" ? school : work;
+    const recs=[];
+    if(m.seen_unseen!=null && m.seen_unseen<75) recs.push({v:m.seen_unseen, title:"Integrity in private",
+      text:T("Run the Diligence 90-day journey as a discipleship track, alongside teaching on doing right in secret (Matthew 6:1–6).","Run the Diligence 90-day journey as a team programme; pair it with a review of where people work unobserved.","Run the Diligence journey as a class challenge with weekly check-ins.")});
+    if(c.flips>=10 && c.heads/c.flips>0.62) recs.push({v:100-Math.round(c.heads/c.flips*100), title:"Quiet truth-shading",
+      text:T("The group shaded small truths when no one could check. A sermon series on Job 31 and small-group Councils on honesty fit well.","An ethics-climate conversation is worth having: the room shaded small truths when unchecked. Run a facilitated Council on honesty with leaders present.","Talk with the class about small lies and fairness; replay a Council focused on honesty.")});
+    if(s.promise_made>=3 && s.promise_kept/s.promise_made<0.6) recs.push({v:Math.round(s.promise_kept/s.promise_made*100), title:"Promise-keeping",
+      text:T("Set up accountability partners or small groups that check on commitments weekly.","Introduce simple commitment tracking and follow-through reviews in team meetings.","Pair students as accountability buddies for a 30-day promise challenge.")});
+    if(m.others_self!=null && m.others_self<70) recs.push({v:m.others_self, title:"A judging spirit",
+      text:T("The Three Fires, beginning with Cain, for elders and ministry leaders.","The Three Fires for the leadership team, starting with Cain (resentment and measuring others).","A Council on fairness and second chances.")});
+    if(s.discernment!=null && s.discernment<55) recs.push({v:s.discernment, title:"Judging others well",
+      text:T("Training for elder, deacon and worker selection, using the IPI's discernment module.","Training for hiring panels and promotion boards on judging character from evidence.","A Sage-level replay as a class, discussing the discernment cases together.")});
+    if(e.trans!=null && e.trans<55) recs.push({v:e.trans, title:"Transparency",
+      text:T("Open-books practices for church finances and decisions; The Three Fires (Korah) for leaders.","The Three Fires Culture Heat Map and a leadership 360 focused on transparency.","Class discussions on owning mistakes early.")});
+    if(pack && (pack.focus||[]).length){
+      const f = pack.focus.filter(k=>e[k]!=null).sort((a,b)=>e[a]-e[b])[0];
+      if(f!=null && e[f]<70) recs.push({v:e[f]-1, title:`${pack.short}: ${EL[f]}`,
+        text:`${EL[f]} is one of the elements that matter most in ${pack.label||pack.short}, and it is this group’s lowest of them (${e[f]}). Make it the theme of your next Council, and replay at Steward or Sage level so the scenes press on it.`});
+    }
+    recs.sort((a,b)=>a.v-b.v);
+    if(pack && pack.group) recs.splice(Math.min(recs.length,2), 0, {v:0, title:`Programme for ${pack.short}`, text:pack.group});
+    if(!recs.length) recs.push({v:100, title:"A strong group",
+      text:T("Train members as Council facilitators and take Undivided to other groups in the church.","Launch an integrity-champions programme: let your strongest people run Councils for other teams.","Let student leaders run a Council for another class.")});
+    return recs.slice(0,3);
+  }
+
+  async function loadSummary(id, name, setting, kind, ind){
     ARCH.layoff = setting==="y" ? ["Rated everyone the same","Inflated a friend's rating","Honest, and told the friend first","Honest, without telling"]
       : setting==="a" ? ["Let go the one who wronged me","Let go the struggling parent","Last in, first out","Cut my own pay","Shared sacrifice, openly"] : [];
     ARCH.bonus = setting==="y" ? ["Kept it for myself","Family first, I wait","Family, and rallied others","Split between both"] : ["Kept it for myself","Family first, then others","Others first, family waits","Split it"];
@@ -163,6 +231,11 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
     }).join("");
     box.innerHTML = `<div class="eyebrow">${s.n} players</div><h2>${esc(name)}</h2>
       <div class="trio"><div><span>Average IQ</span><b>${s.iq}</b></div><div><span>Choices</span><b>${s.choices}</b></div><div><span>Wholeness</span><b>${s.wholeness}</b></div><div><span>Discernment</span><b>${s.discernment}</b></div></div>
+      <div style="background:var(--brass-soft);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+        <div class="eyebrow">Pathfinder · recommended programme</div>
+        ${groupPath(s, kind, ind).map(r=>`<div><b>${esc(r.title)}</b><br>${esc(r.text)}</div>`).join("")}
+        <span class="note">Suggestions from group totals only. Never use them to judge individuals.</span>
+      </div>
       <h3>The four mirrors</h3><div style="display:flex;flex-direction:column;gap:8px">${bars(s.mirrors||{}, MIRRORS)}</div>
       <h3>The eleven elements</h3><div style="display:flex;flex-direction:column;gap:8px">${bars(s.elements||{}, EL)}</div>
       <h3>The Honest Coin</h3><p>${c.flips ? `The group reported ${c.heads} heads from ${c.flips} real flips (${pct}%). Honest flipping lands near 50%. The further above 50%, the more the group as a whole shaded the truth. No individual can be identified from this.` : "No real coin flips were reported."}</p>

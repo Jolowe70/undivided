@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Undivided: The Integrity Quest. An AI-guided game of character built on Job 31.">
 <script src="config.js"></script>
+<script src="industries.js"></script>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 </head>
 <body>
@@ -99,7 +100,7 @@ a.btn{text-decoration:none;display:inline-block}
 .ask{border:1px dashed var(--verd);border-radius:5px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;color:var(--ink)}
 .ask b{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--verd)}
 textarea{width:100%;min-height:72px;background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;resize:vertical}
-input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;width:100%}
+input[type=text],input[type=number],select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--rule);border-radius:4px;padding:10px 12px;width:100%}
 label.field{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
 .seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .seg button{text-align:left;background:var(--bg);border:1px solid var(--rule);border-radius:5px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
@@ -441,7 +442,7 @@ const KEY = "undivided-quest-v1";
 const FRESH = () => ({v:1, step:-1, name:"", lens:"f", set:"a", mode:"solo", exam:false,
   selfHonest:7, promise:null, road:null, ans:{}, why:{}, planks:{}, coins:[], quiz:null, cases:{}, flags:{}, tal:0,
   tally:{}, council:{players:10}, book:null, trial:null, cohort:null, research:false, run:null,
-  level:1, role:"", gen:{}, order:{}, pv:Math.floor(Math.random()*4), offline:false});
+  level:1, role:"", industry:"general", rlevel:1, country:"", gen:{}, order:{}, pv:Math.floor(Math.random()*4), offline:false});
 let S = FRESH();
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 function load(){ try{ const x = JSON.parse(localStorage.getItem(KEY)||"null"); return x && x.v===1 ? x : null; }catch(e){ return null; } }
@@ -487,7 +488,7 @@ async function ai(task, data){
   try{
     const r = await fetch(CFG.supabaseUrl.replace(/\/$/,"")+"/functions/v1/guide", {method:"POST", signal:ctl.signal,
       headers:{"Content-Type":"application/json","apikey":CFG.supabaseKey},
-      body:JSON.stringify({task, lens:S.lens, setting:S.set, mode:S.mode, data})});
+      body:JSON.stringify({task, lens:S.lens, setting:S.set, mode:S.mode, data, field:fieldPayload(), group:S.cohort?S.cohort.code:null})});
     const j = await r.json().catch(()=>({}));
     if(!r.ok || j.error) throw new Error(j.error || ("guide "+r.status));
     return j.result;
@@ -551,7 +552,21 @@ function staticText(id){
     : text.replace("@FOE", "Kunle, a colleague who spread rumours about you for a year,");
   return text;
 }
-function ctx(){ return {level:S.level, role:S.level===3 ? (S.role||"") : "", world:pickOne(WORLDS[S.set==="y"?"y":"a"])}; }
+/* ---------------- Industry packs (industries.js) ----------------
+   Same principles and scoring everywhere; the pack decides whose world the scenes are written for. */
+const IND = () => (window.INDUSTRIES||{})[S.industry||"general"] || {name:"General", short:"General", roles:["Individual","Team lead","Senior leader"], pressures:[], focus:[]};
+const isPack = () => (S.industry||"general")!=="general" && !!(window.INDUSTRIES||{})[S.industry] && !(S.set==="y" && S.industry!=="students");
+function fieldPayload(){
+  if(!isPack() && !S.country) return null;
+  const p=IND();
+  return {name:isPack()?p.name:"", role:isPack()?(p.roles[(S.rlevel||1)-1]||""):"", country:S.country||"",
+    pressures:p.pressures||[], vocabulary:p.vocabulary||"", code:p.code||"", seen:p.seen||"", safety:p.safety||""};
+}
+function ctx(){
+  const w = isPack() && (IND().worlds||[]).length ? IND().worlds : WORLDS[S.set==="y"?"y":"a"];
+  const world = pickOne(w);
+  return {level:S.level, role:S.level===3 ? (S.role||"") : "", world};
+}
 function validScene(r, n){ return r && typeof r.text==="string" && r.text.length>40 && Array.isArray(r.options) && r.options.length===n && r.options.every(o=>o && typeof o.t==="string" && o.t.length>2); }
 async function runJob(j){
   const k=jobKey(j);
@@ -673,6 +688,17 @@ function start(app){
     <div class="setgroup"><span>Setting</span><div class="seg" id="set">
       <button data-v="a" aria-pressed="${S.set==="a"}"><b>Life &amp; Work</b><small>Adults: boardrooms, families, congregations.</small></button>
       <button data-v="y" aria-pressed="${S.set==="y"}"><b>School</b><small>Ages 12–18: classrooms, teams, group chats.</small></button></div></div>
+    <div class="setgroup"><span>Your field</span>
+      <div class="row" style="gap:10px;align-items:flex-end">
+        <label class="field" for="ind" style="flex:2 1 240px">Industry pack
+          <select id="ind">${(window.INDUSTRY_ORDER||["general"]).map(k=>`<option value="${k}" ${S.industry===k?"selected":""}>${esc(window.INDUSTRIES[k].name)}</option>`).join("")}</select></label>
+        <label class="field" for="rl" style="flex:1 1 180px">Your level
+          <select id="rl">${IND().roles.map((r,i)=>`<option value="${i+1}" ${(S.rlevel||1)===i+1?"selected":""}>${esc(r)}</option>`).join("")}</select></label>
+        <label class="field" for="ctry" style="flex:1 1 160px">Country (optional)
+          <input type="text" id="ctry" maxlength="40" list="ctrylist" value="${esc(S.country||"")}" placeholder="e.g. Nigeria"></label>
+        <datalist id="ctrylist"><option>Nigeria</option><option>United States</option><option>United Kingdom</option><option>Ghana</option><option>Kenya</option><option>South Africa</option><option>Canada</option><option>India</option></datalist>
+      </div>
+      <p class="note" id="indnote">${isPack()?`Scenes are written for ${esc(IND().short)}. Same principles, same scoring as every other pack.`:"Pick your line of work and every scene is written for it. The principles and the scoring never change."}${S.cohort&&S.cohort.hasCode?" <b>Your group has loaded its own code of conduct.</b> Scenes will touch its real rules.":""}</p></div>
     <div class="setgroup"><span>Mode</span><div class="seg" id="mode">
       <button data-v="solo" aria-pressed="${S.mode==="solo"}"><b>Solo Quest</b><small>One player, about 25 minutes.</small></button>
       <button data-v="council" aria-pressed="${S.mode==="council"}"><b>The Council</b><small>A group around one screen, with a facilitator.</small></button></div></div>
@@ -692,6 +718,12 @@ function start(app){
   </div>`;
   const segs = (id,key)=> app.querySelectorAll(`#${id} button`).forEach(b=> b.onclick=()=>{ S[key]=b.dataset.v; app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed", x===b)); });
   segs("lens","lens"); segs("set","set"); segs("mode","mode");
+  const syncSet=()=> app.querySelectorAll("#set button").forEach(x=>x.setAttribute("aria-pressed", x.dataset.v===S.set));
+  const paintRoles=()=>{ const r=$("#rl"); if(!r) return; r.innerHTML=IND().roles.map((x,i)=>`<option value="${i+1}" ${(S.rlevel||1)===i+1?"selected":""}>${esc(x)}</option>`).join(""); };
+  const paintIndNote=()=>{ const n=$("#indnote"); if(n) n.innerHTML = (isPack()?`Scenes are written for ${esc(IND().short)}. Same principles, same scoring as every other pack.`:"Pick your line of work and every scene is written for it. The principles and the scoring never change.") + (S.cohort&&S.cohort.hasCode?" <b>Your group has loaded its own code of conduct.</b> Scenes will touch its real rules.":""); };
+  $("#ind").onchange=(e)=>{ S.industry=e.target.value; S.rlevel=1; if(S.industry==="students"){ S.set="y"; syncSet(); } else if(S.set==="y" && isPack()){ S.set="a"; syncSet(); } paintRoles(); paintIndNote(); };
+  $("#rl").onchange=(e)=>{ S.rlevel=+e.target.value||1; };
+  $("#ctry").oninput=(e)=>{ S.country=e.target.value.trim().slice(0,40); };
   app.querySelectorAll("#level button").forEach(b=> b.onclick=()=>{ S.level=+b.dataset.v; app.querySelectorAll("#level button").forEach(x=>x.setAttribute("aria-pressed", x===b)); $("#rolebox").hidden = S.level!==3; if(S.level===3) $("#exam").checked=true; });
   const gcb=$("#gcb"); if(gcb) gcb.onclick=async()=>{
     const code=$("#gc").value.trim().toUpperCase(); const msg=$("#gcmsg");
@@ -702,16 +734,18 @@ function start(app){
       const c = rows && rows[0];
       if(!c){ S.cohort=null; msg.textContent="No group has that code. Check it with your leader."; }
       else{
-        S.cohort={code,name:c.name};
+        S.cohort={code,name:c.name,hasCode:!!c.has_code};
+        if(c.industry && window.INDUSTRIES[c.industry]){ S.industry=c.industry; S.rlevel=1; $("#ind").value=c.industry; paintRoles(); }
+        if(c.country){ S.country=c.country; $("#ctry").value=c.country; }
         if(c.lens) S.lens=c.lens; if(c.setting) S.set=c.setting;
         if(c.level){ S.level=+c.level; app.querySelectorAll("#level button").forEach(x=>x.setAttribute("aria-pressed", +x.dataset.v===S.level)); $("#rolebox").hidden = S.level!==3; }
         ["lens","set"].forEach(id=> app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed", x.dataset.v===S[id==="lens"?"lens":"set"])));
-        msg.textContent=`Joined: ${c.name}. Your leader sees only group totals, never your own results.`;
+        msg.textContent=`Joined: ${c.name}. Your leader sees only group totals, never your own results.`; paintIndNote();
       }
     }catch(e){ msg.textContent="Couldn’t reach the group server. You can still play on your own."; }
     gcb.disabled=false;
   };
-  $("#go").onclick = ()=>{ const lv=+S.level||1; const keep={name:$("#nm").value.trim(),lens:S.lens,set:S.set,mode:S.mode,exam:$("#exam").checked||lv===3,cohort:S.cohort,level:lv,role:lv===3?(($("#role")||{}).value||"").trim().slice(0,120):""}; S=Object.assign(FRESH(),keep); if(S.level>1) S.tal=30; go(0); };
+  $("#go").onclick = ()=>{ const lv=+S.level||1; const keep={name:$("#nm").value.trim(),lens:S.lens,set:S.set,mode:S.mode,exam:$("#exam").checked||lv===3,cohort:S.cohort,industry:S.industry,rlevel:S.rlevel,country:S.country,level:lv,role:lv===3?(($("#role")||{}).value||"").trim().slice(0,120):""}; S=Object.assign(FRESH(),keep); if(S.level>1) S.tal=30; go(0); };
   if(resume){ $("#resume").onclick=()=>{ S=saved; render(); }; $("#discard").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} render(); }; }
 }
 
@@ -1171,24 +1205,26 @@ function final(app){
     <h3>The eleven elements</h3>
     <div class="bars">${bars}<div class="bar found"><span>Fidelity (foundation)</span><div class="tr"><i style="width:${R.fid}%"></i></div><em>${R.fid}%</em></div></div>
 
+    ${fieldFocus(R)}
+
     <div class="book" id="book"><p class="loading">${esc(guide())} is writing your book…</p></div>
 
     <div class="ask"><b>${esc(guide())}’s Trial</b><p>One more scene, written just for you, on your growing edge: ${esc(elName(R.weak[0]||"hon"))}.</p><div id="trial"><button class="btn ghost small" id="trialbtn">Face the Trial</button></div></div>
 
-    ${backendReady()?deeperPanel(R):""}
+    ${deeperPanel(R)}
 
     <div class="row"><button class="btn" id="copy">Copy summary for an accountability partner</button><button class="btn ghost" id="again">Play again</button></div>
     <p class="note">Undivided is a reflection tool, not a validated psychological test. Don’t use these results for hiring, grading, discipline or church office. Talents were worth nothing. What you did with them was worth noticing.</p>
   </div>`;
 
   $("#copy").onclick=()=>{
-    const txt = `UNDIVIDED · The Integrity Quest\n${who} · IQ ${R.iq} (${pick(R.rank[1])})\nChoices ${R.choices} · Wholeness ${R.whole} · Discernment ${R.disc}\nStrongest: ${R.strong.map(elName).join(", ")}\nGrowing edge: ${R.weak.map(elName).join(", ")}\nMirrors: Seen/Unseen ${R.seen}, Say/Do ${R.say}, Others/Self ${R.plank}, Promise/Path ${R.fid}` + (S.book&&S.book.commission?`\nCommission: ${S.book.commission}`:"");
+    const txt = `UNDIVIDED · The Integrity Quest${isPack()?" · "+IND().short:""}\n${who} · IQ ${R.iq} (${pick(R.rank[1])})\nChoices ${R.choices} · Wholeness ${R.whole} · Discernment ${R.disc}\nStrongest: ${R.strong.map(elName).join(", ")}\nGrowing edge: ${R.weak.map(elName).join(", ")}\nMirrors: Seen/Unseen ${R.seen}, Say/Do ${R.say}, Others/Self ${R.plank}, Promise/Path ${R.fid}` + (S.book&&S.book.commission?`\nCommission: ${S.book.commission}`:"");
     const done=()=>toast("Summary copied");
     try{ navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt)); }catch(e){ fallbackCopy(txt); }
   };
-  $("#again").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} const keep={name:S.name,lens:S.lens,set:S.set,mode:S.mode,exam:S.exam,cohort:S.cohort,level:S.level,role:S.role}; S=Object.assign(FRESH(),keep); S.step=-1; render(); };
+  $("#again").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} const keep={name:S.name,lens:S.lens,set:S.set,mode:S.mode,exam:S.exam,cohort:S.cohort,industry:S.industry,rlevel:S.rlevel,country:S.country,level:S.level,role:S.role}; S=Object.assign(FRESH(),keep); S.step=-1; render(); };
   $("#trialbtn").onclick=()=>trial(R);
-  if(backendReady()) wireDeeper(R);
+  wireDeeper(R);
   writeBook(R);
 }
 
@@ -1205,6 +1241,20 @@ function fireFor(R){
     const m=v.reduce((s,x)=>s+x,0)/v.length; if(!best||m<best.m) best={k,m}; }
   return best ? FIRES[best.k] : FIRES.balaam;
 }
+/* Field focus: which elements carry the most weight in this line of work. Display and Pathfinder only; the IQ is unchanged. */
+function fieldFocus(R){
+  if(!isPack()) return "";
+  const p=IND(), f=(p.focus||[]).filter(k=>ELS[k]);
+  if(!f.length) return "";
+  const rows=f.map(k=>({k, v:R.els[k]})).filter(x=>x.v!=null);
+  if(!rows.length) return "";
+  const low=[...rows].sort((a,b)=>a.v-b.v)[0];
+  return `<div class="conseq"><div class="eyebrow">Field focus · ${esc(p.short)}${S.rlevel?` · ${esc(p.roles[S.rlevel-1]||"")}`:""}</div>
+    <p>In ${esc(p.label||p.short)}, these elements carry the most weight. Your scores on them:</p>
+    <div class="bars">${rows.map(x=>`<div class="bar ${x.v<50?"low":""}"><span>${esc(elName(x.k))}</span><div class="tr"><i style="width:${x.v}%"></i></div><em>${x.v}%</em></div>`).join("")}</div>
+    <p>${low.v>=75?`You were strong on all of them. In your field, that is what people will most rely on you for.`:`Your field’s growing edge for you is <b>${esc(elName(low.k))}</b>. Watch for it under the everyday pressures of ${esc(p.label||p.short)}, especially when you are tired, behind, or among friends.`}</p>
+    ${S.cohort&&S.cohort.hasCode?`<p class="note">These scenes drew on your organisation’s own code of conduct.</p>`:""}</div>`;
+}
 function runPayload(R, link){
   return {
     cohort_code: S.cohort ? S.cohort.code : null, lens:S.lens, setting:S.set, mode:S.mode, exam:!!S.exam,
@@ -1216,6 +1266,7 @@ function runPayload(R, link){
       cases:Object.fromEntries(Object.entries(S.cases).map(([k,v])=>[k,{seen:v.seen,verdict:v.verdict,conf:v.conf}])),
       coins:R.coins ? (R.coins.council?{n:R.coins.p,h:R.coins.h,council:true}:{n:R.coins.n,h:R.coins.h}) : null,
       level:S.level||1, promise_variant:S.pv||0,
+      industry:S.industry||"general", role_level:S.rlevel||1, country:S.country||null, own_code:!!(S.cohort&&S.cohort.hasCode),
       generated:Object.fromEntries(Object.entries(S.gen).map(([k,v])=>[k, v.src==="ai"])),
       case_truth:Object.fromEntries(["femi","bayo"].map(k=>[k, caseData(k).truth]))},
     research_consent:!!S.research, link_consent:!!link
@@ -1233,9 +1284,50 @@ async function ensureLink(R){
   const code = await rpc("ud_enable_link",{p_id:S.run.id, p_token:S.run.token});
   S.run.link_code = code; save(); return code;
 }
+/* ---------------- Pathfinder: the right next step for this player ----------------
+   Suggestions, never labels. Driven by the weakest mirror first (how undivided the person is),
+   then by the weakest elements (mapped to the Jude 1:11 fires). */
+function pathfinder(R){
+  const f=fireFor(R);
+  const P = {
+    diligence:{key:"diligence", title:"The Diligence Profile and 90-day journey", url:CFG.diligenceUrl, cta:"Start the Diligence Profile"},
+    ipi:{key:"ipi", title:"The full Integrity Profile (IPI)", url:CFG.commonsUrl, cta:"Take the IPI"},
+    fires:{key:"fires", title:`The Three Fires: the way of ${f.name}`, url:CFG.threeFiresUrl, cta:"Explore The Three Fires"},
+    sage:{key:"sage", title:"A Sage-level replay of Undivided", url:"#replay", cta:"Replay at Sage level"},
+    lead:{key:"lead", title:"Lead a Council for your church, class or team", url:"leader.html", cta:"Open the leader dashboard"}
+  };
+  const m = [
+    {k:"seen", v:R.seen, path:"diligence", why:"You were stronger when others were watching than when you were alone. Integrity that depends on an audience is strengthened by small private practices, repeated daily. That is exactly what the Diligence 90-day journey builds, starting with Integrity-in-Action."},
+    {k:"fid", v:R.fid, path:"diligence", why:"The promise you made at the start didn’t survive the road. Fidelity is the foundation of the Integrity Quotient, and it grows through daily follow-through, which is what the Diligence journey trains."},
+    {k:"say", v:R.say, path:"ipi", why:"How you see your honesty and what you actually did didn’t line up. The IPI lets you look at yourself carefully across all 11 pillars, so your self-image can catch up with the truth."},
+    {k:"plank", v:R.plank, path:"fires", why:"You judged other people’s wrongs more harshly than the same wrongs of your own. The Three Fires explores this pattern directly, beginning with Cain: the measuring of others."},
+    {k:"disc", v:R.disc, path:"sage", why:"You judged other people’s integrity on early appearances. A Sage-level replay gives you harder, greyer cases and more practice in waiting for the evidence."}
+  ].filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);
+  let primary, why;
+  if(R.iq>=85 && R.whole>=85){ primary=P.lead; why="Your choices and your mirrors agree: you are largely the same person seen and unseen. The next step is to help others see themselves. Run a Council for your church, class or team."; }
+  else if(m.length && m[0].v<75){ primary=P[m[0].path]; why=m[0].why; if(m[0].path==="fires") primary=P.fires; }
+  else {
+    primary=P.fires;
+    const ff = isPack() ? (IND().focus||[]).filter(k=>R.els[k]!=null && R.els[k]<75).sort((a,b)=>R.els[a]-R.els[b]) : [];
+    why = ff.length
+      ? `Your mirrors were steady. In ${IND().label||IND().short}, your growing edge is ${elName(ff[0])}, and your weakest elements overall (${R.weak.slice(0,2).map(elName).join(" and ")}) most resemble the way of ${f.name}: ${f.desc}.`
+      : `Your mirrors were steady. Your growing edge sits in ${R.weak.slice(0,2).map(elName).join(" and ")}, which most resembles the way of ${f.name}: ${f.desc}.`;
+  }
+  const others = ["diligence","ipi","fires"].filter(k=>k!==primary.key).map(k=>P[k]);
+  return {primary, why, others};
+}
 function deeperPanel(R){
   const f=fireFor(R);
+  const pf=pathfinder(R); S.path=pf.primary.key; save();
+  const href=(p)=> p.url==="#replay" ? "#" : esc(p.url||"#");
   return `<div class="conseq" id="deeper">
+    <div class="eyebrow">Pathfinder · your recommended next step</div>
+    <h3>${esc(pf.primary.title)}</h3>
+    <p>${esc(pf.why)}</p>
+    <p id="pathnote" class="note"></p>
+    <div class="row"><a class="btn brass" id="lk-primary" data-key="${pf.primary.key}" href="${href(pf.primary)}" ${pf.primary.url&&pf.primary.url.startsWith("http")?'target="_blank" rel="noopener"':""}>${esc(pf.primary.cta)}</a></div>
+    <p class="note">A suggestion for growth, not a verdict on you.</p>
+    ${isPack()&&IND().group?`<p><b>For your ${S.industry==="students"?"school":"organisation"} (${esc(IND().short)}):</b> ${esc(IND().group)}</p>`:""}
     <b>Your next 100 days</b>
     <div class="tells">
       <div><b>Days 1–7 · Practise</b>Live the three missions above. Your Book of Your Life is your guide.</div>
@@ -1251,17 +1343,21 @@ function deeperPanel(R){
       <a class="btn ghost" id="lk-ic" href="${esc(CFG.commonsUrl||"#")}" target="_blank" rel="noopener">The full Integrity Profile (IPI)</a>
       <a class="btn ghost" id="lk-tf" href="${esc(CFG.threeFiresUrl||"#")}" target="_blank" rel="noopener">The Three Fires</a>
     </div>
-    <label class="row" style="gap:8px;font-size:15px;align-items:flex-start"><input type="checkbox" id="carry" ${S.run&&S.run.link_code?"checked":""} style="margin-top:5px"> <span>Carry my scores with me to these sites (scores only, never what I wrote). The link code lasts 120 days, long enough for the whole journey.</span></label>
+    ${backendReady()?"":"<!--"}<label class="row" style="gap:8px;font-size:15px;align-items:flex-start"><input type="checkbox" id="carry" ${S.run&&S.run.link_code?"checked":""} style="margin-top:5px"> <span>Carry my scores with me to these sites (scores only, never what I wrote). The link code lasts 120 days, long enough for the whole journey.</span></label>${backendReady()?"":"-->"}
     <p class="note" id="savemsg"></p>
   </div>`;
 }
 function wireDeeper(R){
   const msg=$("#savemsg");
+  const pk=$("#lk-primary");
+  if(pk && pk.dataset.key==="sage") pk.onclick=(e)=>{ e.preventDefault(); try{localStorage.removeItem(KEY);}catch(_){} const keep={name:S.name,lens:S.lens,set:S.set,mode:S.mode,exam:true,cohort:S.cohort,industry:S.industry,rlevel:S.rlevel,country:S.country,level:3,role:S.role}; S=Object.assign(FRESH(),keep); S.tal=30; S.step=-1; render(); toast("Sage level selected. Add your real role, then begin."); };
   const setLinks=(code)=>{
     const add=(u)=> u ? u + (u.includes("?")?"&":"?") + "ud=" + encodeURIComponent(code) : "#";
+    const pk=$("#lk-primary"); if(pk){ const map={diligence:CFG.diligenceUrl, ipi:CFG.commonsUrl, fires:CFG.threeFiresUrl}; if(map[pk.dataset.key]) pk.href = code ? add(map[pk.dataset.key]) : (map[pk.dataset.key]||"#"); }
     if(code){ $("#lk-dp").href=add(CFG.diligenceUrl); $("#lk-ic").href=add(CFG.commonsUrl); $("#lk-tf").href=add(CFG.threeFiresUrl); msg.textContent=`Your link code is ${code}. All three buttons now carry it. Write it down for Day 100.`; }
     else { $("#lk-dp").href=CFG.diligenceUrl||"#"; $("#lk-ic").href=CFG.commonsUrl||"#"; $("#lk-tf").href=CFG.threeFiresUrl||"#"; }
   };
+  if(!backendReady() || !$("#carry")) return;
   if(S.run && S.run.link_code) setLinks(S.run.link_code);
   else if((S.cohort||S.research) && !S.run){
     submitRun(R,false).then(()=>{ msg.textContent = S.cohort ? `Saved to the totals for ${S.cohort.name}.` : "Saved anonymously for research. Thank you."; })
@@ -1302,6 +1398,7 @@ function paintBook(b){
     <div class="eyebrow">Seven-day missions</div>
     <div class="missions">${(b.missions||[]).slice(0,3).map(m=>`<div><b>${esc(m.element)}</b>${esc(m.task)}</div>`).join("")}</div>
     ${b.question?`<div class="ask"><b>A question to sit with</b><p>${esc(b.question)}</p></div>`:""}`;
+  const pn=$("#pathnote"); if(pn && b.path_note) pn.textContent = guide()+": "+b.path_note;
 }
 async function writeBook(R){
   if(S.book){ paintBook(S.book); return; }
@@ -1309,7 +1406,7 @@ async function writeBook(R){
   const data = {name:S.name||"the player", iq:R.iq, rank:pick(R.rank[1]), choices:R.choices, wholeness:R.whole, discernment:R.disc,
     elements:Object.entries(R.els).filter(([,v])=>v!=null).map(([k,v])=>elName(k)+" "+v).join(", "),
     mirrors:`Seen/Unseen ${R.seen}; Say/Do ${R.say} (${R.notes.join(" ")}); Others/Self ${R.plank} (gap ${R.gapAvg.toFixed(1)}); Promise/Path ${R.fid} (promise: ${S.promise}, road: ${S.road})`,
-    weakest:R.weak.map(elName).join(", "), log};
+    weakest:R.weak.map(elName).join(", "), path:(pathfinder(R).primary.title), log};
   try{
     const b = await ai("book", data);
     if(!b || !b.defense || !b.verdict) throw new Error("bad");

@@ -62,3 +62,19 @@ If the guide can't be reached, the classic scenes are used (still shuffled), so 
 
 ## v3b · The Diligence link (the 100-Day Plumb Line)
 Results now end with "Your next 100 days": Days 1–7 practise, Day 8 the Diligence Profile, Days 8–97 the 90-day journey, Day 100 replay Undivided. Link codes last 120 days. The Diligence site's side of the link is in its own update zip (undivided-link.js).
+
+## v3c · Pathfinder
+Results open with one recommended next step, chosen from the weakest mirror first (seen/unseen gap or a broken promise → Diligence; say/do gap → IPI; judging others harshly → Three Fires; low discernment → Sage replay; strong across the board → lead a Council), then from the weakest elements. Elihu adds a one-line personal note. The leader dashboard shows up to three programme suggestions per group, worded for churches, workplaces or schools, from group totals only. No new SQL beyond v3 and v3b.
+
+## v4 · Industry packs + Bring Your Own Code of Conduct
+**13 packs** (plus General): Banking & finance · Law enforcement · Military · Sales · Education · Healthcare · Church & ministry · Government & public service · Legal · Technology & AI · Construction & engineering · Students (school) · **Manufacturing Identity Track (Rebuilt Workplace)**.
+
+- Same 11 elements, same four mirrors, same scoring in every pack. A pack changes *whose world* the scenes are written for: its workplaces, pressure points, vocabulary, professional standards, and how "watched vs alone" looks in that job.
+- Each pack has three role levels (frontline / manager / executive) and an optional country.
+- **Field focus** on the results page shows the 3–4 elements that matter most in that field (display and Pathfinder only; the IQ is unchanged).
+- Group Pathfinder on the leader dashboard adds the field's weakest focus element and a field-specific programme. For the MIT pack: Undivided at Day 0 and Day 100 as the behavioural measure, then the Integrity Track and the Culture Track.
+- Packs are plain data in `industries.js`. Edit the wording there freely.
+
+**Bring your own code:** in `leader.html`, each group has a *Code of conduct* button. Paste up to 20,000 characters. The text stays in Supabase (owner-only); players never see it. The first time a player in that group plays, the guide writes a short summary (shown back to the leader for checking) and grounds the scenes in the organisation's real rules.
+
+Upgrade steps: run `undivided-v4-industry-migration.sql` once, redeploy the `guide` function, push the site (now includes `industries.js`).
