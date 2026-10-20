@@ -79,7 +79,7 @@ th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:up
 
     <div class="card">
       <h2>Your groups</h2>
-      <div class="scroll"><table><thead><tr><th>Group</th><th>Code</th><th>Players</th><th></th></tr></thead><tbody id="list"><tr><td colspan="4" class="note">Loading…</td></tr></tbody></table></div>
+      <div class="scroll"><table><thead><tr><th>Group</th><th>Code</th><th>Plays</th><th></th></tr></thead><tbody id="list"><tr><td colspan="4" class="note">Loading…</td></tr></tbody></table></div>
     </div>
 
     <div class="card" id="codebox" hidden></div>
@@ -97,6 +97,10 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const EL = {hon:"Honesty",chas:"Faithfulness & Boundaries",fair:"Fairness & Equity",char:"Charity / Compassion",fam:"Family",pow:"Use of Power",cont:"Contentment",mercy:"Mercy",trans:"Transparency",opp:"Second Chances",just:"Justice & Stewardship"};
 const INDS = window.INDUSTRIES || {}, IORDER = window.INDUSTRY_ORDER || Object.keys(INDS);
+const ROUNDS = [[0,"Day 0","baseline"],[50,"Day 50","check-in"],[100,"Day 100","proof"]];
+const RNAME = r => (ROUNDS.find(x=>x[0]===r)||[0,"Day "+r])[1];
+const GAME_URL = location.origin + location.pathname.replace(/leader\.html.*$/,"");
+const cohortLink = code => GAME_URL + "?g=" + encodeURIComponent(code);
 const MIRRORS = {seen_unseen:"Seen · Unseen",say_do:"Say · Do",others_self:"Others · Self",promise_path:"Promise · Path"};
 // What each option MEANS (its archetype). Scenes are rewritten every play and options are shuffled, so results are grouped by meaning, not by letter.
 const ARCH = {
@@ -153,9 +157,24 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
     if(error){ $("#list").innerHTML = `<tr><td colspan="4">Couldn’t load groups: ${esc(error.message)}</td></tr>`; return; }
     if(!data.length){ $("#list").innerHTML = `<tr><td colspan="4" class="note">No groups yet. Create one above, then share its code.</td></tr>`; return; }
     $("#list").innerHTML = data.map(c => `<tr><td>${esc(c.name)}<br><span class="note">${esc(c.kind)}${c.lens?" · "+(c.lens==="f"?"Faith":"Civic"):""}${c.setting?" · "+(c.setting==="y"?"School":"Life & Work"):""}${c.level?" · Level "+c.level:""}${c.industry&&INDS[c.industry]?" · "+esc(INDS[c.industry].short):""}${c.country?" · "+esc(c.country):""}${c.has_code?" · <b>own code loaded</b>":""}</span></td>
-      <td class="code">${esc(c.code)}</td><td>${c.players}</td><td style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost" data-act="sum" data-id="${esc(c.id)}" data-name="${esc(c.name)}" data-set="${esc(c.setting||"")}" data-kind="${esc(c.kind||"other")}" data-ind="${esc(c.industry||"")}">Results</button><button class="btn ghost" data-act="code" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Code of conduct</button></td></tr>`).join("");
+      <td class="code">${esc(c.code)}</td><td>${c.players}</td><td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label class="note" style="display:flex;gap:6px;align-items:center;margin:0">Open round <select data-act="round" data-id="${esc(c.id)}">${ROUNDS.map(r=>`<option value="${r[0]}" ${+c.current_round===r[0]?"selected":""}>${r[1]} · ${r[2]}</option>`).join("")}</select></label>
+        <button class="btn ghost" data-act="link" data-code="${esc(c.code)}">Copy player link</button><button class="btn ghost" data-act="sum" data-id="${esc(c.id)}" data-name="${esc(c.name)}" data-set="${esc(c.setting||"")}" data-kind="${esc(c.kind||"other")}" data-ind="${esc(c.industry||"")}">Results</button><button class="btn ghost" data-act="code" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Code of conduct</button></td></tr>`).join("");
     document.querySelectorAll("#list button[data-act=sum]").forEach(b => b.onclick = () => loadSummary(b.dataset.id, b.dataset.name, b.dataset.set, b.dataset.kind, b.dataset.ind));
     document.querySelectorAll("#list button[data-act=code]").forEach(b => b.onclick = () => openCode(b.dataset.id, b.dataset.name));
+    document.querySelectorAll("#list button[data-act=link]").forEach(b => b.onclick = async () => {
+      const url = cohortLink(b.dataset.code);
+      try{ await navigator.clipboard.writeText(url); b.textContent = "Copied ✓"; }
+      catch(e){ prompt("Copy this link and share it with your group:", url); }
+      setTimeout(()=>{ b.textContent = "Copy player link"; }, 2500);
+    });
+    document.querySelectorAll("#list select[data-act=round]").forEach(sel => sel.onchange = async () => {
+      const r = +sel.value;
+      if(!confirm(`Open ${RNAME(r)} for this group? Every play finished from now on counts toward ${RNAME(r)}.`)){ loadList(); return; }
+      const { error } = await sb.rpc("ud_set_cohort_round", { p_id:sel.dataset.id, p_round:r });
+      if(error){ alert("Couldn’t change the round: " + error.message); }
+      loadList();
+    });
   }
 
   // Bring your own code of conduct: private to this group. Players never see the text.
@@ -214,14 +233,41 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
     return recs.slice(0,3);
   }
 
-  async function loadSummary(id, name, setting, kind, ind){
+  // Day 0 → Day 100: group averages per round (each round needs 5+ plays before it shows)
+  function progressBlock(rr){
+    if(!rr || !rr.rounds) return "";
+    const R = rr.rounds, open = R.filter(x=>x.open);
+    const counts = R.map(x=>`<span><b>${RNAME(x.rd)}</b>: ${x.n} play${x.n===1?"":"s"}${x.open?"":" (opens at "+rr.min_group+")"}${x.rd===rr.current_round?" · <i>open now</i>":""}</span>`).join("");
+    if(open.length < 2) return `<div class="lock" style="display:flex;flex-direction:column;gap:4px"><div class="eyebrow">Progress across rounds</div><div class="dist">${counts}</div><span class="note">The before-and-after comparison appears once two rounds each have ${rr.min_group}+ plays.</span></div>`;
+    const first = open[0], last = open[open.length-1];
+    const row = (label, get) => { const a=get(first.scores), b=get(last.scores); if(a==null||b==null) return ""; const d=b-a;
+      return `<tr><td>${esc(label)}</td>${R.map(x=>`<td>${x.open && get(x.scores)!=null ? get(x.scores) : "—"}</td>`).join("")}<td style="font-weight:600;color:${d>0?"var(--brass)":d<0?"#a33":"inherit"}">${d>0?"+":""}${d}</td></tr>`; };
+    const rows = [["Integrity Quotient", s=>s.iq],["Choices", s=>s.choices],["Wholeness", s=>s.wholeness],["Discernment", s=>s.discernment]]
+      .concat(Object.keys(MIRRORS).map(k=>[MIRRORS[k], s=>(s.mirrors||{})[k]]))
+      .concat(Object.keys(EL).map(k=>[EL[k], s=>(s.elements||{})[k]]))
+      .map(([l,g])=>row(l,g)).join("");
+    const iqd = last.scores.iq - first.scores.iq;
+    return `<div><div class="eyebrow">Progress across rounds · ${RNAME(first.rd)} → ${RNAME(last.rd)}</div>
+      <p>${iqd>0?`The group’s average Integrity Quotient rose by <b>${iqd}</b> points.`:iqd<0?`The group’s average Integrity Quotient fell by <b>${-iqd}</b> points. Look at the mirrors below for where.`:"The group’s average Integrity Quotient held steady."} Every play saw fresh scenes, so this is a change in choices, not memory.</p>
+      <div class="scroll"><table><thead><tr><th></th>${R.map(x=>`<th>${RNAME(x.rd)}<br><span class="note">${x.n} plays</span></th>`).join("")}<th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">Group averages only. Different people may have played in each round, and a reflection game is not a validated test, so read this as a signal for discussion and programme design, not as proof about any person.</p></div>`;
+  }
+
+  async function loadSummary(id, name, setting, kind, ind, round){
+    round = (round===undefined || round===null || round==="") ? null : +round;
     ARCH.layoff = setting==="y" ? ["Rated everyone the same","Inflated a friend's rating","Honest, and told the friend first","Honest, without telling"]
       : setting==="a" ? ["Let go the one who wronged me","Let go the struggling parent","Last in, first out","Cut my own pay","Shared sacrifice, openly"] : [];
     ARCH.bonus = setting==="y" ? ["Kept it for myself","Family first, I wait","Family, and rallied others","Split between both"] : ["Kept it for myself","Family first, then others","Others first, family waits","Split it"];
     const box = $("#sum"); box.hidden = false; box.innerHTML = `<p class="note">Loading ${esc(name)}…</p>`;
-    const { data:s, error } = await sb.rpc("ud_cohort_summary", { p_id:id });
+    const [{ data:s, error }, { data:rr }] = await Promise.all([
+      sb.rpc("ud_cohort_summary", { p_id:id, p_round:round }),
+      sb.rpc("ud_cohort_rounds", { p_id:id })
+    ]);
     if(error){ box.innerHTML = `<p>Couldn’t load results: ${esc(error.message)}</p>`; return; }
-    if(s.locked){ box.innerHTML = `<h2>${esc(name)}</h2><div class="lock"><b>${s.n} of ${s.min_group} players so far.</b> Results unlock at ${s.min_group}, so no one can be singled out.</div>`; return; }
+    const tabs = `<div class="row" style="gap:6px;flex-wrap:wrap" id="rtabs">${[[null,"All plays"]].concat(ROUNDS.map(r=>[r[0],r[1]])).map(([v,l])=>`<button class="btn ${v===round?"":"ghost"}" data-r="${v===null?"":v}">${l}</button>`).join("")}</div>`;
+    const head = `<div class="eyebrow">${s.n} plays${round!==null?" · "+RNAME(round):""}</div><h2>${esc(name)}</h2>${tabs}${progressBlock(rr)}`;
+    const wire = () => box.querySelectorAll("#rtabs button").forEach(b => b.onclick = () => loadSummary(id, name, setting, kind, ind, b.dataset.r));
+    if(s.locked){ box.innerHTML = `${head}<div class="lock"><b>${s.n} of ${s.min_group} plays so far${round!==null?" in "+RNAME(round):""}.</b> Results unlock at ${s.min_group}, so no one can be singled out.</div>`; wire(); return; }
     const bars = (obj, labels) => Object.keys(labels).filter(k => obj[k] != null).map(k => `<div class="bar ${obj[k]<50?"low":""}"><span>${esc(labels[k])}</span><div class="tr"><i style="width:${obj[k]}%"></i></div><em>${obj[k]}</em></div>`).join("");
     const c = s.coins || {flips:0, heads:0};
     const pct = c.flips ? Math.round(c.heads / c.flips * 100) : null;
@@ -229,7 +275,7 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
       const d = s.scenes[k]; const tot = Object.values(d).reduce((a,b)=>a+b,0);
       return `<tr><td>${esc(SCENES[k])}</td><td><div class="dist">${Object.keys(d).sort().map(o => `<span>${esc((ARCH[k]||[])[+o] || "Option "+(+o+1))}: ${Math.round(d[o]/tot*100)}%</span>`).join("")}</div></td></tr>`;
     }).join("");
-    box.innerHTML = `<div class="eyebrow">${s.n} players</div><h2>${esc(name)}</h2>
+    box.innerHTML = `${head}
       <div class="trio"><div><span>Average IQ</span><b>${s.iq}</b></div><div><span>Choices</span><b>${s.choices}</b></div><div><span>Wholeness</span><b>${s.wholeness}</b></div><div><span>Discernment</span><b>${s.discernment}</b></div></div>
       <div style="background:var(--brass-soft);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
         <div class="eyebrow">Pathfinder · recommended programme</div>
@@ -242,6 +288,7 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
       <h3>Promises</h3><p>${s.promise_made ? `${s.promise_kept} of ${s.promise_made} players who promised Mara kept their word without a reminder.` : "No one in this group made the promise."}</p>
       <h3>How the group chose, scene by scene</h3><p class="note">Each player saw a different version of every scene, so choices are grouped by what they meant. Use these for discussion, not judgment.</p>
       <div class="scroll"><table><tbody>${scenes}</tbody></table></div>`;
+    wire();
     box.scrollIntoView({behavior:"smooth"});
   }
 }

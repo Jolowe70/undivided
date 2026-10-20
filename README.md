@@ -78,3 +78,10 @@ Results open with one recommended next step, chosen from the weakest mirror firs
 **Bring your own code:** in `leader.html`, each group has a *Code of conduct* button. Paste up to 20,000 characters. The text stays in Supabase (owner-only); players never see it. The first time a player in that group plays, the guide writes a short summary (shown back to the leader for checking) and grounds the scenes in the organisation's real rules.
 
 Upgrade steps: run `undivided-v4-industry-migration.sql` once, redeploy the `guide` function, push the site (now includes `industries.js`).
+
+## v5 · Rounds (Day 0 / 50 / 100) + one-click cohort link
+- **Player link:** `undividedos.com/?g=CODE` joins the group automatically (pack, level, code of conduct). On the leader page, "Copy player link" copies it.
+- **Rounds:** each group has an *Open round* (Day 0 baseline → Day 50 check-in → Day 100 proof). The leader switches it; the server stamps every finished play with the open round. Plays already in a group count as Day 0.
+- **Progress across rounds:** the results page compares rounds side by side with the change, once two rounds each have 5+ plays. Tabs show results for one round at a time; the 5-play lock applies to each round.
+- **Rebuilt Workplace:** `bridge/rebuilt-workplace-button.html` is a ready-made "Play Undivided" block to paste into the programme (replace COHORTCODE).
+Upgrade: run `undivided-v5-rounds-migration.sql` once, then push the site. The guide function does not change.

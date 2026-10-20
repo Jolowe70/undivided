@@ -439,6 +439,9 @@ const MISSIONS = {
 
 /* ---------------- State ---------------- */
 const KEY = "undivided-quest-v1";
+const ROUND_NAME = {0:"Day 0 · baseline", 50:"Day 50 · check-in", 100:"Day 100 · proof"};
+// One-click cohort link: undividedos.com/?g=CODE joins the group automatically.
+const URL_GROUP = (()=>{ try{ const g=new URLSearchParams(location.search).get("g"); return g && /^[A-Za-z0-9]{4,10}$/.test(g) ? g.toUpperCase() : null; }catch(e){ return null; } })();
 const FRESH = () => ({v:1, step:-1, name:"", lens:"f", set:"a", mode:"solo", exam:false,
   selfHonest:7, promise:null, road:null, ans:{}, why:{}, planks:{}, coins:[], quiz:null, cases:{}, flags:{}, tal:0,
   tally:{}, council:{players:10}, book:null, trial:null, cohort:null, research:false, run:null,
@@ -734,18 +737,22 @@ function start(app){
       const c = rows && rows[0];
       if(!c){ S.cohort=null; msg.textContent="No group has that code. Check it with your leader."; }
       else{
-        S.cohort={code,name:c.name,hasCode:!!c.has_code};
+        S.cohort={code,name:c.name,hasCode:!!c.has_code,round:(c.current_round==null?null:+c.current_round)};
         if(c.industry && window.INDUSTRIES[c.industry]){ S.industry=c.industry; S.rlevel=1; $("#ind").value=c.industry; paintRoles(); }
         if(c.country){ S.country=c.country; $("#ctry").value=c.country; }
         if(c.lens) S.lens=c.lens; if(c.setting) S.set=c.setting;
         if(c.level){ S.level=+c.level; app.querySelectorAll("#level button").forEach(x=>x.setAttribute("aria-pressed", +x.dataset.v===S.level)); $("#rolebox").hidden = S.level!==3; }
         ["lens","set"].forEach(id=> app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed", x.dataset.v===S[id==="lens"?"lens":"set"])));
-        msg.textContent=`Joined: ${c.name}. Your leader sees only group totals, never your own results.`; paintIndNote();
+        msg.textContent=`Joined: ${c.name}${S.cohort.round!=null?" · "+ROUND_NAME[S.cohort.round]:""}. Your leader sees only group totals, never your own results.`; paintIndNote();
       }
     }catch(e){ msg.textContent="Couldn’t reach the group server. You can still play on your own."; }
     gcb.disabled=false;
   };
   $("#go").onclick = ()=>{ const lv=+S.level||1; const keep={name:$("#nm").value.trim(),lens:S.lens,set:S.set,mode:S.mode,exam:$("#exam").checked||lv===3,cohort:S.cohort,industry:S.industry,rlevel:S.rlevel,country:S.country,level:lv,role:lv===3?(($("#role")||{}).value||"").trim().slice(0,120):""}; S=Object.assign(FRESH(),keep); if(S.level>1) S.tal=30; go(0); };
+  if(URL_GROUP && gcb && !(S.cohort && S.cohort.code===URL_GROUP && S.cohort._viaLink)){
+    $("#gc").value=URL_GROUP;
+    gcb.onclick().then(()=>{ if(S.cohort && S.cohort.code===URL_GROUP){ S.cohort._viaLink=true; const m=$("#gcmsg"); m.innerHTML = `<b>Welcome, ${esc(S.cohort.name)}.</b> Your group is set up${S.cohort.round!=null?" for <b>"+esc(ROUND_NAME[S.cohort.round])+"</b>":""}. Add your name if you like, then press <b>Begin the quest</b>. Your leader sees only group totals, never your own results.`; m.scrollIntoView({behavior:"smooth",block:"center"}); } });
+  }
   if(resume){ $("#resume").onclick=()=>{ S=saved; render(); }; $("#discard").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} render(); }; }
 }
 
@@ -1275,7 +1282,7 @@ function runPayload(R, link){
 async function submitRun(R, link){
   if(S.run) return S.run;
   const out = await rpc("ud_submit_run",{p:runPayload(R, link)});
-  S.run = {id:out.id, token:out.token, link_code:out.link_code||null}; save();
+  S.run = {id:out.id, token:out.token, link_code:out.link_code||null, round:(out.round==null?null:+out.round)}; save();
   return S.run;
 }
 async function ensureLink(R){
@@ -1360,7 +1367,7 @@ function wireDeeper(R){
   if(!backendReady() || !$("#carry")) return;
   if(S.run && S.run.link_code) setLinks(S.run.link_code);
   else if((S.cohort||S.research) && !S.run){
-    submitRun(R,false).then(()=>{ msg.textContent = S.cohort ? `Saved to the totals for ${S.cohort.name}.` : "Saved anonymously for research. Thank you."; })
+    submitRun(R,false).then(()=>{ msg.textContent = S.cohort ? `Saved to the totals for ${S.cohort.name}${S.run&&S.run.round!=null?" ("+ROUND_NAME[S.run.round]+")":""}.` : "Saved anonymously for research. Thank you."; })
       .catch(()=>{ msg.textContent="Couldn’t save to the server. Your results are still on this device."; });
   }
   $("#carry").onchange=async(e)=>{
