@@ -66,6 +66,7 @@ th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:up
         <label for="gk">Type<select id="gk"><option value="school">School</option><option value="church">Church</option><option value="workplace">Workplace</option><option value="other">Other</option></select></label>
         <label for="gl">Lens<select id="gl"><option value="">Player chooses</option><option value="f">Faith</option><option value="c">Civic</option></select></label>
         <label for="gs">Setting<select id="gs"><option value="">Player chooses</option><option value="a">Life &amp; Work</option><option value="y">School (12–18)</option></select></label>
+        <label for="glv">Level<select id="glv"><option value="">Player chooses</option><option value="1">1 · Seeker</option><option value="2">2 · Steward</option><option value="3">3 · Sage</option></select></label>
       </div>
       <div class="row"><button class="btn" id="mk">Create group</button><span class="note" id="mkmsg"></span></div>
     </div>
@@ -88,6 +89,22 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const EL = {hon:"Honesty",chas:"Faithfulness & Boundaries",fair:"Fairness & Equity",char:"Charity / Compassion",fam:"Family",pow:"Use of Power",cont:"Contentment",mercy:"Mercy",trans:"Transparency",opp:"Second Chances",just:"Justice & Stewardship"};
 const MIRRORS = {seen_unseen:"Seen · Unseen",say_do:"Say · Do",others_self:"Others · Self",promise_path:"Promise · Path"};
+// What each option MEANS (its archetype). Scenes are rewritten every play and options are shuffled, so results are grouped by meaning, not by letter.
+const ARCH = {
+  change:["Returned it at once","Kept it quietly","Joked and kept it","Returned it for applause"],
+  error:["Owned it openly","Fixed or kept it quietly","Left it hidden","Got advice privately"],
+  creditSeen:["Corrected the record on the spot","Took the credit","Corrected it later, privately"],
+  garden:["Crossed the line","Stepped back quietly","Held the line","Brought in accountability"],
+  layoff:["Option 1","Option 2","Option 3","Option 4","Option 5"],
+  stream:["Took the harmful shortcut","Did it right, at a cost","Half-measure","Did right and went further"],
+  bonus:["Kept it for self","Family first, then others","Others first, family waits","Split it"],
+  checkout:["Went back and paid","Walked away","Promised to fix it later","Paid and reported the fault"],
+  panel:["Chose merit over grudge","Chose loyalty over merit","Declared the conflict, stepped back","Avoided both"],
+  creditAlone:["Gave the credit by name","Called it team work","Took the credit"],
+  offer:["Took the money","Declined","Honest terms only","Took a compromise"],
+  chat:["Piled on","Stayed silent","Reached out privately","Asked others to stop"],
+  return:["Refused a second chance","Same terms as everyone","Second chance with safeguards","Said yes, acted no"]
+};
 const SCENES = {change:"Gate 1 · Wrong change (watched)",error:"Gate 1 · The hidden mistake",creditSeen:"Gate 1 · Credit for Tolu (watched)",garden:"Gate 2 · The Garden",layoff:"Gate 3 · Who goes / the grading",stream:"Gate 3 · The stream / the clean-up",bonus:"Gate 4 · The bonus / the savings",checkout:"Gate 5 · The unscanned item (alone)",panel:"Gate 5 · The hiring panel / quiz team",creditAlone:"Gate 6 · Credit for Tolu (alone)",offer:"Gate 6 · The offer",chat:"Gate 7 · The group chat",return:"Gate 7 · The second chance"};
 
 if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !window.supabase){
@@ -113,7 +130,7 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
   $("#mk").onclick = async () => {
     const name = $("#gn").value.trim(); if(name.length < 2){ $("#mkmsg").textContent = "Give the group a name first."; return; }
     $("#mk").disabled = true;
-    const { data, error } = await sb.rpc("ud_create_cohort", { p_name:name, p_kind:$("#gk").value, p_lens:$("#gl").value || null, p_setting:$("#gs").value || null });
+    const { data, error } = await sb.rpc("ud_create_cohort", { p_name:name, p_kind:$("#gk").value, p_lens:$("#gl").value || null, p_setting:$("#gs").value || null, p_level:$("#glv").value ? +$("#glv").value : null });
     $("#mk").disabled = false;
     if(error){ $("#mkmsg").textContent = "Couldn’t create the group: " + error.message; return; }
     $("#mkmsg").innerHTML = `Created. Players enter code <span class="code">${esc(data.code)}</span> on the game’s start screen.`;
@@ -124,12 +141,15 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
     const { data, error } = await sb.rpc("ud_my_cohorts");
     if(error){ $("#list").innerHTML = `<tr><td colspan="4">Couldn’t load groups: ${esc(error.message)}</td></tr>`; return; }
     if(!data.length){ $("#list").innerHTML = `<tr><td colspan="4" class="note">No groups yet. Create one above, then share its code.</td></tr>`; return; }
-    $("#list").innerHTML = data.map(c => `<tr><td>${esc(c.name)}<br><span class="note">${esc(c.kind)}${c.lens?" · "+(c.lens==="f"?"Faith":"Civic"):""}${c.setting?" · "+(c.setting==="y"?"School":"Life & Work"):""}</span></td>
-      <td class="code">${esc(c.code)}</td><td>${c.players}</td><td><button class="btn ghost" data-id="${esc(c.id)}" data-name="${esc(c.name)}">Results</button></td></tr>`).join("");
-    document.querySelectorAll("#list button").forEach(b => b.onclick = () => loadSummary(b.dataset.id, b.dataset.name));
+    $("#list").innerHTML = data.map(c => `<tr><td>${esc(c.name)}<br><span class="note">${esc(c.kind)}${c.lens?" · "+(c.lens==="f"?"Faith":"Civic"):""}${c.setting?" · "+(c.setting==="y"?"School":"Life & Work"):""}${c.level?" · Level "+c.level:""}</span></td>
+      <td class="code">${esc(c.code)}</td><td>${c.players}</td><td><button class="btn ghost" data-id="${esc(c.id)}" data-name="${esc(c.name)}" data-set="${esc(c.setting||"")}">Results</button></td></tr>`).join("");
+    document.querySelectorAll("#list button").forEach(b => b.onclick = () => loadSummary(b.dataset.id, b.dataset.name, b.dataset.set));
   }
 
-  async function loadSummary(id, name){
+  async function loadSummary(id, name, setting){
+    ARCH.layoff = setting==="y" ? ["Rated everyone the same","Inflated a friend's rating","Honest, and told the friend first","Honest, without telling"]
+      : setting==="a" ? ["Let go the one who wronged me","Let go the struggling parent","Last in, first out","Cut my own pay","Shared sacrifice, openly"] : [];
+    ARCH.bonus = setting==="y" ? ["Kept it for myself","Family first, I wait","Family, and rallied others","Split between both"] : ["Kept it for myself","Family first, then others","Others first, family waits","Split it"];
     const box = $("#sum"); box.hidden = false; box.innerHTML = `<p class="note">Loading ${esc(name)}…</p>`;
     const { data:s, error } = await sb.rpc("ud_cohort_summary", { p_id:id });
     if(error){ box.innerHTML = `<p>Couldn’t load results: ${esc(error.message)}</p>`; return; }
@@ -139,7 +159,7 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
     const pct = c.flips ? Math.round(c.heads / c.flips * 100) : null;
     const scenes = Object.keys(SCENES).filter(k => s.scenes && s.scenes[k]).map(k => {
       const d = s.scenes[k]; const tot = Object.values(d).reduce((a,b)=>a+b,0);
-      return `<tr><td>${esc(SCENES[k])}</td><td><div class="dist">${Object.keys(d).sort().map(o => `<span>${"ABCDE"[+o]||o}: ${Math.round(d[o]/tot*100)}%</span>`).join("")}</div></td></tr>`;
+      return `<tr><td>${esc(SCENES[k])}</td><td><div class="dist">${Object.keys(d).sort().map(o => `<span>${esc((ARCH[k]||[])[+o] || "Option "+(+o+1))}: ${Math.round(d[o]/tot*100)}%</span>`).join("")}</div></td></tr>`;
     }).join("");
     box.innerHTML = `<div class="eyebrow">${s.n} players</div><h2>${esc(name)}</h2>
       <div class="trio"><div><span>Average IQ</span><b>${s.iq}</b></div><div><span>Choices</span><b>${s.choices}</b></div><div><span>Wholeness</span><b>${s.wholeness}</b></div><div><span>Discernment</span><b>${s.discernment}</b></div></div>
@@ -147,7 +167,7 @@ if(!CFG.supabaseUrl || /YOUR-/.test(CFG.supabaseUrl + CFG.supabaseKey) || !windo
       <h3>The eleven elements</h3><div style="display:flex;flex-direction:column;gap:8px">${bars(s.elements||{}, EL)}</div>
       <h3>The Honest Coin</h3><p>${c.flips ? `The group reported ${c.heads} heads from ${c.flips} real flips (${pct}%). Honest flipping lands near 50%. The further above 50%, the more the group as a whole shaded the truth. No individual can be identified from this.` : "No real coin flips were reported."}</p>
       <h3>Promises</h3><p>${s.promise_made ? `${s.promise_kept} of ${s.promise_made} players who promised Mara kept their word without a reminder.` : "No one in this group made the promise."}</p>
-      <h3>How the group chose, scene by scene</h3><p class="note">Letters match the order of options in the game. Use these for discussion, not judgment.</p>
+      <h3>How the group chose, scene by scene</h3><p class="note">Each player saw a different version of every scene, so choices are grouped by what they meant. Use these for discussion, not judgment.</p>
       <div class="scroll"><table><tbody>${scenes}</tbody></table></div>`;
     box.scrollIntoView({behavior:"smooth"});
   }

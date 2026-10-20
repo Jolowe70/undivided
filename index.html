@@ -440,7 +440,8 @@ const MISSIONS = {
 const KEY = "undivided-quest-v1";
 const FRESH = () => ({v:1, step:-1, name:"", lens:"f", set:"a", mode:"solo", exam:false,
   selfHonest:7, promise:null, road:null, ans:{}, why:{}, planks:{}, coins:[], quiz:null, cases:{}, flags:{}, tal:0,
-  tally:{}, council:{players:10}, book:null, trial:null, cohort:null, research:false, run:null});
+  tally:{}, council:{players:10}, book:null, trial:null, cohort:null, research:false, run:null,
+  level:1, role:"", gen:{}, order:{}, pv:Math.floor(Math.random()*4), offline:false});
 let S = FRESH();
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 function load(){ try{ const x = JSON.parse(localStorage.getItem(KEY)||"null"); return x && x.v===1 ? x : null; }catch(e){ return null; } }
@@ -501,6 +502,130 @@ async function rpc(name, args){
   return j;
 }
 
+/* ---------------- Dynamic engine ----------------
+   Every scene is a BLUEPRINT: a fixed principle, a fixed moral structure and fixed scoring (SCN above).
+   Each play, the guide writes a fresh situation on top of it: new people, setting, stakes and wording.
+   Options keep their scoring identity (archetype index) but are shown in a shuffled order.
+   If the guide is unavailable, the classic text is used, still shuffled. */
+const LEVELS = {
+  1:{name:"Seeker", sub:"Clear choices. Best for students, first plays and groups."},
+  2:{name:"Steward", sub:"Two goods collide. Every option sounds reasonable; doing right costs something real."},
+  3:{name:"Sage", sub:"Scenes written for your real role. Grey areas, missing facts, no feedback until the end."}
+};
+const WORLDS = {
+  a:["a family-owned bakery in Lagos","a church building committee","a hospital night shift","a road-construction firm","a fintech start-up","a village farmers' cooperative","a secondary school staff room","a regional bank branch","a ride-hailing driver's week","a government permits office","a non-profit food bank","a football club's board","a law firm partnership","a real-estate agency","an airline crew","a university research lab","a family wedding committee","a tailoring shop","a pharmacy","a trucking company","a mosque or church charity drive","a construction site in Texas","a newsroom","a call centre","an oil-and-gas contractor","a small clinic in Ibadan","a tech company's sales team","a choir and music ministry","a property management office","a city council meeting"],
+  y:["a school football team","a science fair","a class group chat","a weekend job at a shop","a youth choir","a school election","a coding club","a family market stall","a school trip","an online gaming team","a church youth camp","a debate team","a school canteen","a neighbourhood clean-up","a dance crew","a library volunteer shift","a robotics competition","a school newspaper","a tutoring group","a birthday party"]
+};
+const cap = t => t.charAt(0).toUpperCase()+t.slice(1);
+const pickOne = a => a[Math.floor(Math.random()*a.length)];
+function shuffle(n){ const a=[...Array(n).keys()]; for(let i=n-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+// Generation jobs by gate (paired scenes are written together so they share a principle but not a surface).
+const JOBS = [
+  {gate:1, kind:"pair", a:"change", b:"checkout"},
+  {gate:1, kind:"pair", a:"creditSeen", b:"creditAlone"},
+  {gate:1, kind:"scene", id:"error"},
+  {gate:2, kind:"scene", id:"garden"},
+  {gate:2, kind:"plank", a:"p1o", b:"p1s"},
+  {gate:3, kind:"scene", id:"layoff"},
+  {gate:3, kind:"scene", id:"stream"},
+  {gate:3, kind:"plank", a:"p2o", b:"p2s"},
+  {gate:4, kind:"scene", id:"bonus"},
+  {gate:4, kind:"case", id:"femi"},
+  {gate:5, kind:"scene", id:"panel"},
+  {gate:5, kind:"case", id:"bayo"},
+  {gate:6, kind:"scene", id:"offer"},
+  {gate:7, kind:"scene", id:"chat"},
+  {gate:7, kind:"scene", id:"return"}
+];
+const jobKey = j => j.id || (j.a+"+"+j.b);
+const inflight = {};
+function blueprintOf(id){
+  const sc=SCN[id];
+  return {gate:GATES[sc.gate].name, principle:pick(GATES[sc.gate].els), pattern:staticText(id),
+    options:optsOf(id).map(o=>({t:pick(o.t), c:pick(o.c)}))};
+}
+function staticText(id){
+  let text = pick(SCN[id].text);
+  if(id==="chat" && S.set==="a") text = S.flags.firedMarcus
+    ? "Marcus, whom you let go in the budget cuts and who has bad-mouthed you ever since, has just been fired from his new job, and everyone knows. Your old team’s group chat is roasting him. You have a screenshot of something he once said that would make it much worse."
+    : text.replace("@FOE", "Kunle, a colleague who spread rumours about you for a year,");
+  return text;
+}
+function ctx(){ return {level:S.level, role:S.level===3 ? (S.role||"") : "", world:pickOne(WORLDS[S.set==="y"?"y":"a"])}; }
+function validScene(r, n){ return r && typeof r.text==="string" && r.text.length>40 && Array.isArray(r.options) && r.options.length===n && r.options.every(o=>o && typeof o.t==="string" && o.t.length>2); }
+async function runJob(j){
+  const k=jobKey(j);
+  if(inflight[k]) return inflight[k];
+  const done = j.kind==="scene"||j.kind==="case" ? S.gen[j.id] : S.gen[j.a];
+  if(done) return;
+  inflight[k] = (async()=>{
+    try{
+      if(!backendReady() || S.offline) throw new Error("offline");
+      if(j.kind==="scene"){
+        const bp=blueprintOf(j.id);
+        if(j.id==="error") bp.want_echo=true;
+        if(j.id==="chat" && S.flags.firedMarcus) bp.cascade="The person who wronged the player is someone the player personally let go earlier in the game, who has been bad-mouthing them since.";
+        const r = await ai("scene", {...ctx(), ...bp});
+        if(!validScene(r, bp.options.length)) throw new Error("bad scene");
+        S.gen[j.id]={text:r.text, opts:r.options.map(o=>({t:o.t, c:o.c||""})), echo:typeof r.echo==="string"?r.echo:"", src:"ai"};
+      } else if(j.kind==="pair"){
+        const A=blueprintOf(j.a), B=blueprintOf(j.b);
+        const r = await ai("pair", {...ctx(), seen:A, alone:B});
+        if(!r || !validScene(r.seen, A.options.length) || !validScene(r.alone, B.options.length)) throw new Error("bad pair");
+        S.gen[j.a]={text:r.seen.text, opts:r.seen.options.map(o=>({t:o.t,c:o.c||""})), src:"ai"};
+        S.gen[j.b]={text:r.alone.text, opts:r.alone.options.map(o=>({t:o.t,c:o.c||""})), src:"ai"};
+      } else if(j.kind==="plank"){
+        const r = await ai("plank", {...ctx(), pattern_other:pick(PLANK[j.a].text), pattern_self:pick(PLANK[j.b].text)});
+        if(!r || typeof r.other!=="string" || typeof r.self!=="string") throw new Error("bad plank");
+        S.gen[j.a]={text:r.other, src:"ai"}; S.gen[j.b]={text:r.self, src:"ai"};
+      } else if(j.kind==="case"){
+        const truth = Math.random()<0.5;
+        const r = await ai("case", {...ctx(), truth, pattern:CASES[j.id].cards.join(" | ")});
+        if(!r || typeof r.who!=="string" || !Array.isArray(r.cards) || r.cards.length!==4 || typeof r.reveal!=="string") throw new Error("bad case");
+        S.gen[j.id]={who:r.who, cards:r.cards.map(String), reveal:r.reveal, lesson:String(r.lesson||""), truth, src:"ai"};
+      }
+    }catch(e){
+      // Classic fallback: same principle, original wording.
+      if(j.kind==="scene") S.gen[j.id]={src:"classic"};
+      else if(j.kind==="case") S.gen[j.id]={src:"classic"};
+      else { S.gen[j.a]={src:"classic"}; S.gen[j.b]={src:"classic"}; }
+    }
+    save();
+  })();
+  try{ await inflight[k]; } finally { delete inflight[k]; }
+}
+function prepareGate(g){ return Promise.allSettled(JOBS.filter(j=>j.gate===g).map(runJob)); }
+function sceneText(id){ const g=S.gen[id]; return g && g.src==="ai" ? g.text : staticText(id); }
+function sceneOpt(id, i){ // display text + consequence for archetype i; scoring always from the blueprint
+  const g=S.gen[id], base=optsOf(id)[i];
+  if(g && g.src==="ai" && g.opts && g.opts[i]) return {...base, t:g.opts[i].t, c:g.opts[i].c || pick(base.c)};
+  return base;
+}
+function orderOf(id, n){ if(!S.order[id] || S.order[id].length!==n) { S.order[id]=shuffle(n); save(); } return S.order[id]; }
+// Mara's promise comes in several versions so the test can't be memorized.
+const PROMISES = [
+  {who:"Mara", desc:"An old woman named Mara", ask:"a basket too heavy for me to carry home", lane:"the Market Lane", gold:"the Golden Road"},
+  {who:"Tunde", desc:"A blind old fisherman named Tunde", ask:"a letter from my son that I cannot read", lane:"the Well Path", gold:"the Bridge of Coins"},
+  {who:"Ruth", desc:"A widow named Ruth, sitting by her cart", ask:"a broken cart wheel I can’t lift alone", lane:"the Mill Road", gold:"the Crown Road"},
+  {who:"Ike", desc:"A small boy named Ike, clutching a torn kite", ask:"my little sister, who is lost and frightened", lane:"the Orchard Way", gold:"the Silver Stair"}
+];
+const PV = () => PROMISES[S.pv||0];
+// Quiz bank: three drawn at random each play, answers shuffled.
+const QBANK = [
+  {q:"The word “integrity” comes from the Latin integer. What does integer mean?", o:["Whole, undivided","Honest","Strong","Upright"]},
+  {q:{f:"In the Book of Job, how many friends came to comfort Job before Elihu spoke?",c:"Builders use a plumb line to check that a wall is…"}, o:{f:["Three","Two","Four","Seven"],c:["Truly vertical","Level along the ground","The right length","Strong enough"]}},
+  {q:"In a well-known study, people rolled a die in private and were paid by the number they reported. What did researchers find?", o:["Many shaded the truth a little; few lied all the way","Almost everyone reported honestly","Most people lied to get the maximum","Only children lied"]},
+  {q:{f:"In Job 31:1, Job says he made a covenant with his…",c:"The Latin word candidus, from which “candid” comes, means…"}, o:{f:["Eyes","Hands","Tongue","Feet"],c:["White, shining","Careful","Gentle","Brave"]}},
+  {q:{f:"Who is described in Scripture as “perfect and upright, one that feared God, and eschewed evil”?",c:"An independent audit mainly exists to…"}, o:{f:["Job","David","Solomon","Daniel"],c:["Give outside assurance that records are accurate","Find someone to blame","Cut costs","Replace the managers"]}},
+  {q:{f:"“The integrity of the upright shall guide them” is found in which book?",c:"A conflict of interest exists when…"}, o:{f:["Proverbs","Psalms","Job","Ecclesiastes"],c:["A personal interest could improperly influence a duty you hold","Two colleagues disagree","A company has competitors","You change your mind"]}},
+  {q:"The “bystander effect” describes how people…", o:["Are less likely to help when others are present","Help more when others watch","Always call for help","Copy the first person who helps"]},
+  {q:"Whistleblowing means…", o:["Reporting wrongdoing to people who can stop it","Spreading gossip about a boss","Leaving a job without notice","Refusing to do overtime"]},
+  {q:{f:"Which disciple denied knowing Jesus three times?",c:"The Golden Rule says…"}, o:{f:["Peter","John","Thomas","Andrew"],c:["Treat others as you want to be treated","Whoever has the gold makes the rules","Always tell the truth","Never lend money"]}},
+  {q:"Plagiarism means…", o:["Presenting someone else’s work or ideas as your own","Quoting a source with credit","Writing very quickly","Using a dictionary"]},
+  {q:{f:"In Job 31:6, Job asks to be weighed in…",c:"The Latin word veritas means…"}, o:{f:["An even balance","A golden scale","The temple court","The sight of his friends"],c:["Truth","Courage","Wealth","Victory"]}},
+  {q:"A “white lie” is usually understood as…", o:["A small lie told to spare feelings or avoid trouble","A lie that is never discovered","A lie told in court","A promise you forget"]}
+]; // the correct answer is always listed first here; it is shuffled on screen
+
 /* ---------------- Rail ---------------- */
 function rail(){
   const g = S.step>=0 ? gateOf(S.step) : 0;
@@ -551,7 +676,12 @@ function start(app){
     <div class="setgroup"><span>Mode</span><div class="seg" id="mode">
       <button data-v="solo" aria-pressed="${S.mode==="solo"}"><b>Solo Quest</b><small>One player, about 25 minutes.</small></button>
       <button data-v="council" aria-pressed="${S.mode==="council"}"><b>The Council</b><small>A group around one screen, with a facilitator.</small></button></div></div>
-    <label class="row" style="gap:8px;font-size:15px"><input type="checkbox" id="exam" ${S.exam?"checked":""}> Examiner mode: no feedback until the very end (harder)</label>
+    <div class="setgroup"><span>Level</span><div class="seg" id="level">
+      ${[1,2,3].map(n=>`<button data-v="${n}" aria-pressed="${(+S.level||1)===n}"><b>${n} · ${LEVELS[n].name}</b><small>${LEVELS[n].sub}</small></button>`).join("")}</div></div>
+    <label class="field" for="role" id="rolebox" ${(+S.level||1)===3?"":"hidden"}>Your real role, so ${S.lens==="f"?"Elihu":"The Witness"} can write scenes for your life (optional, never saved)
+      <input type="text" id="role" maxlength="120" value="${esc(S.role||"")}" placeholder="e.g. senior pastor of a 400-member church; CFO of a logistics company; Year 11 student and team captain"></label>
+    <p class="note">Every play is new: the scenes are rewritten each time around the same principles, so the quest can’t be memorized or gamed.</p>
+    <label class="row" style="gap:8px;font-size:15px"><input type="checkbox" id="exam" ${S.exam?"checked":""}> Examiner mode: no feedback until the very end (always on at Sage)</label>
     <div class="row"><button class="btn brass" id="go">Begin the quest</button><span class="note">Have a real coin nearby. You’ll need it three times.</span></div>
     <details class="guide"><summary>For schools, boardrooms and churches</summary><div>
       <div class="cols">
@@ -562,6 +692,7 @@ function start(app){
   </div>`;
   const segs = (id,key)=> app.querySelectorAll(`#${id} button`).forEach(b=> b.onclick=()=>{ S[key]=b.dataset.v; app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed", x===b)); });
   segs("lens","lens"); segs("set","set"); segs("mode","mode");
+  app.querySelectorAll("#level button").forEach(b=> b.onclick=()=>{ S.level=+b.dataset.v; app.querySelectorAll("#level button").forEach(x=>x.setAttribute("aria-pressed", x===b)); $("#rolebox").hidden = S.level!==3; if(S.level===3) $("#exam").checked=true; });
   const gcb=$("#gcb"); if(gcb) gcb.onclick=async()=>{
     const code=$("#gc").value.trim().toUpperCase(); const msg=$("#gcmsg");
     if(!code){ S.cohort=null; msg.textContent="No group. You’re playing on your own."; return; }
@@ -573,18 +704,20 @@ function start(app){
       else{
         S.cohort={code,name:c.name};
         if(c.lens) S.lens=c.lens; if(c.setting) S.set=c.setting;
+        if(c.level){ S.level=+c.level; app.querySelectorAll("#level button").forEach(x=>x.setAttribute("aria-pressed", +x.dataset.v===S.level)); $("#rolebox").hidden = S.level!==3; }
         ["lens","set"].forEach(id=> app.querySelectorAll(`#${id} button`).forEach(x=>x.setAttribute("aria-pressed", x.dataset.v===S[id==="lens"?"lens":"set"])));
         msg.textContent=`Joined: ${c.name}. Your leader sees only group totals, never your own results.`;
       }
     }catch(e){ msg.textContent="Couldn’t reach the group server. You can still play on your own."; }
     gcb.disabled=false;
   };
-  $("#go").onclick = ()=>{ const keep={name:$("#nm").value.trim(),lens:S.lens,set:S.set,mode:S.mode,exam:$("#exam").checked,cohort:S.cohort}; S=Object.assign(FRESH(),keep); go(0); };
+  $("#go").onclick = ()=>{ const lv=+S.level||1; const keep={name:$("#nm").value.trim(),lens:S.lens,set:S.set,mode:S.mode,exam:$("#exam").checked||lv===3,cohort:S.cohort,level:lv,role:lv===3?(($("#role")||{}).value||"").trim().slice(0,120):""}; S=Object.assign(FRESH(),keep); if(S.level>1) S.tal=30; go(0); };
   if(resume){ $("#resume").onclick=()=>{ S=saved; render(); }; $("#discard").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} render(); }; }
 }
 
 function covenant(app){
   const faith = S.lens==="f";
+  prepareGate(1);
   app.innerHTML = `<div class="card">
     <div class="eyebrow">Before the first gate</div>
     <h2>The covenant</h2>
@@ -605,15 +738,16 @@ function covenant(app){
 function promise(app){
   app.innerHTML = `<div class="card">
     <div class="eyebrow">At the city gate</div>
-    <h2>Mara’s request</h2>
-    <p class="scene">An old woman named Mara stops you as you set out. “Traveller, when you leave the Vault, the sixth gate, take the <b>Market Lane</b>, not the Golden Road. I’ll be waiting there with a basket too heavy for me to carry home. Will you come?”</p>
+    <h2>${esc(PV().who)}’s request</h2>
+    <p class="scene">${esc(PV().desc)} stops you as you set out. “Traveller, when you leave the Vault, the sixth gate, take <b>${esc(PV().lane)}</b>, not ${esc(PV().gold)}. I’ll be waiting there with ${esc(PV().ask)}. Will you come?”</p>
     <div class="opts" id="o"></div><div id="after"></div></div>`;
   const o=[["yes","“I promise. I’ll be there.”"],["no","“I’m sorry. I can’t promise that.”"],["maybe","“Maybe, if I can.”"]];
   $("#o").innerHTML = o.map((x,i)=>`<button class="opt" data-v="${x[0]}"><span class="k">${"ABC"[i]}</span><span>${esc(x[1])}</span></button>`).join("");
   app.querySelectorAll(".opt").forEach(b=> b.onclick=()=>{
     S.promise=b.dataset.v; save();
     app.querySelectorAll(".opt").forEach(x=>{ x.disabled=true; x.classList.toggle("picked",x===b); });
-    const r = {yes:"Mara squeezes your hand. “Then I’ll wait.”", no:"Mara nods slowly. “An honest no is better than a careless yes.”", maybe:"Mara smiles a little. “I’ll look for you.”"}[S.promise];
+    const w=PV().who;
+    const r = {yes:`${w} squeezes your hand. “Then I’ll wait.”`, no:`${w} nods slowly. “An honest no is better than a careless yes.”`, maybe:`${w} smiles a little. “I’ll look for you.”`}[S.promise];
     $("#after").innerHTML = `<div class="conseq"><p>${r}</p><div class="row"><button class="btn" id="n">Walk to the first gate</button></div></div>`;
     $("#n").onclick=next;
   });
@@ -622,11 +756,18 @@ function promise(app){
 function gate(app, st){
   const G=GATES[st.g], v=pick(G.v);
   app.innerHTML = `<div class="card">
-    <div class="eyebrow">Gate ${st.g} of 7 · ${T(G.els)}</div>
+    <div class="eyebrow">Gate ${st.g} of 7 · ${T(G.els)} · Level ${S.level||1} ${esc(LEVELS[S.level||1].name)}</div>
     <h2>${esc(G.name)}</h2>
     <p class="lede">Guarding this gate: <b>${T(G.foe)}</b>.</p>
     <blockquote class="verse">${esc(v[0])}<cite>${esc(v[1])}</cite></blockquote>
-    <div class="row"><button class="btn brass" id="n">Pass through</button></div></div>`;
+    <p class="note" id="prep">${esc(guide())} is writing this gate’s scenes for you…</p>
+    <div class="row"><button class="btn brass" id="n" disabled>Pass through</button></div></div>`;
+  const ready=()=>{ const n=$("#n"); if(!n) return; n.disabled=false; const p=$("#prep");
+    const classic = JOBS.filter(j=>j.gate===st.g).some(j=>{ const g=S.gen[j.id||j.a]; return g && g.src==="classic"; });
+    if(p) p.textContent = classic ? "Some scenes are in their classic form this time (the guide couldn’t be reached)." : "Your scenes are ready. No one else will see these exact ones.";
+    if(st.g<7) prepareGate(st.g+1); };
+  const t0=Date.now();
+  prepareGate(st.g).then(()=>{ if(STEPS[S.step]===st) ready(); });
   $("#n").onclick=next;
 }
 
@@ -637,11 +778,10 @@ function chipsFor(d, tal){
 }
 
 function choice(app, st){
-  const sc=SCN[st.id]; const opts=optsOf(st.id);
-  let text = pick(sc.text);
-  if(st.id==="chat" && S.set==="a") text = S.flags.firedMarcus
-    ? "Marcus, whom you let go in the budget cuts and who has bad-mouthed you ever since, has just been fired from his new job, and everyone knows. Your old team’s group chat is roasting him. You have a screenshot of something he once said that would make it much worse."
-    : text.replace("@FOE", "Kunle, a colleague who spread rumours about you for a year,");
+  const sc=SCN[st.id];
+  const opts=optsOf(st.id).map((o,i)=>sceneOpt(st.id,i));      // archetype order (scoring)
+  const ord=orderOf(st.id, opts.length);                          // display order (shuffled)
+  const text = sceneText(st.id);
   const ref = S.lens==="f" && sc.ref ? sc.ref.f : null;
   const answered = S.ans[st.id];
   app.innerHTML = `<div class="card">
@@ -649,13 +789,16 @@ function choice(app, st){
     <p class="scene">${esc(text)}</p>
     ${ref?`<blockquote class="verse">${esc(ref[0])}<cite>${esc(ref[1])}</cite></blockquote>`:""}
     ${S.mode==="council"?`<div class="ask"><b>Discuss · 3 minutes</b><p>${T(sc.ask)}</p></div>`:""}
-    <div class="opts" id="o">${opts.map((op,i)=>`<button class="opt" data-i="${i}"><span class="k">${"ABCDE"[i]}</span><span>${T(op.t)}</span></button>`).join("")}</div>
+    <div class="opts" id="o">${ord.map((ai,pos)=>`<button class="opt" data-i="${ai}"><span class="k">${"ABCDE"[pos]}</span><span>${T(opts[ai].t)}</span></button>`).join("")}</div>
     ${S.mode==="council"?`<div class="setgroup"><span>Room tally (show of hands)</span><div class="tally" id="tally"></div></div>`:""}
-    <div class="row" id="askrow"><button class="btn ghost small" id="askbtn">Ask ${esc(guide())} before deciding</button></div>
+    <div class="row" id="askrow"><button class="btn ghost small" id="askbtn">Ask ${esc(guide())} before deciding${(S.level||1)>1?" · 10 talents":""}</button></div>
     <div id="askout"></div>
     <div id="after"></div></div>`;
   if(S.mode==="council") drawTally(st.id, opts.length);
-  $("#askbtn").onclick=()=>askGuide(sc, text, opts);
+  $("#askbtn").onclick=()=>{
+    if((S.level||1)>1){ if(S.tal<10){ toast("You need 10 talents to ask for counsel."); return; } S.tal-=10; save(); rail(); }
+    $("#askbtn").disabled=true; askGuide(sc, text, ord.map(i=>opts[i]));
+  };
   const choose = (i)=>{
     const op=opts[i];
     app.querySelectorAll("#o .opt").forEach(x=>{ x.disabled=true; x.classList.toggle("picked", +x.dataset.i===i); });
@@ -735,7 +878,7 @@ function plank(app, st){
   const P=PLANK[st.id]; const val = S.planks[st.id] ?? 5;
   app.innerHTML = `<div class="card">
     <div class="eyebrow">Gate ${gateOf(S.step)} · A quick judgment</div>
-    <p class="scene">${T(P.text)}</p>
+    <p class="scene">${S.gen[st.id] && S.gen[st.id].src==="ai" ? esc(S.gen[st.id].text) : T(P.text)}</p>
     <label class="field" for="pv">How serious is this?
       <input type="range" id="pv" min="0" max="10" value="${val}"><div class="scale"><span>0 · No big deal</span><b id="pvv" class="big" style="font-size:22px">${val}</b><span>10 · Very serious</span></div></label>
     <div class="row"><button class="btn" id="n">Record and continue</button></div></div>`;
@@ -743,8 +886,13 @@ function plank(app, st){
   $("#n").onclick=()=>{ S.planks[st.id]=+$("#pv").value; save(); next(); };
 }
 
+function quizSet(){
+  if(!S.qset){ const qi=shuffle(QBANK.length).slice(0,3); S.qset=qi.map(i=>({i, ord:shuffle(4)})); save(); }
+  return S.qset.map(({i,ord})=>{ const q=QBANK[i], o=pick(q.o); return {q:q.q, o:ord.map(k=>o[k]), a:ord.indexOf(0)}; });
+}
 function quiz(app){
   if(S.quiz && S.quiz.done){ next(); return; }
+  const QUIZ = quizSet();
   const Q = S.quiz || (S.quiz={ans:[null,null,null], keyEarly:false, done:false});
   let left = 45, timer=null, submitted=false;
   app.innerHTML = `<div class="card">
@@ -755,13 +903,13 @@ function quiz(app){
     <div id="qs"></div>
     <div class="row"><button class="btn" id="sub">Submit answers</button><button class="btn ghost small" id="key">Answer key</button></div>
     <div id="keybox"></div><div id="after"></div></div>`;
-  $("#qs").innerHTML = QUIZ.map((q,i)=>`<div class="q"><b>${i+1}. ${T(q.q)}</b><div class="opts">${pick(q.o).map((o,j)=>`<button class="opt" data-q="${i}" data-j="${j}"><span class="k">${"ABCD"[j]}</span><span>${esc(o)}</span></button>`).join("")}</div></div>`).join("");
+  $("#qs").innerHTML = QUIZ.map((q,i)=>`<div class="q"><b>${i+1}. ${T(q.q)}</b><div class="opts">${q.o.map((o,j)=>`<button class="opt" data-q="${i}" data-j="${j}"><span class="k">${"ABCD"[j]}</span><span>${esc(o)}</span></button>`).join("")}</div></div>`).join("");
   const paint=()=> app.querySelectorAll("#qs .opt").forEach(b=> b.classList.toggle("picked", Q.ans[+b.dataset.q]===+b.dataset.j));
   paint();
   app.querySelectorAll("#qs .opt").forEach(b=> b.onclick=()=>{ if(submitted) return; Q.ans[+b.dataset.q]=+b.dataset.j; paint(); save(); });
   $("#key").onclick=()=>{
     if(!submitted) Q.keyEarly=true; save();
-    $("#keybox").innerHTML = `<div class="key">${QUIZ.map((q,i)=>`${i+1}. ${esc(pick(q.o)[q.a])}`).join("<br>")}</div>`;
+    $("#keybox").innerHTML = `<div class="key">${QUIZ.map((q,i)=>`${i+1}. ${esc(q.o[q.a])}`).join("<br>")}</div>`;
   };
   const tick=()=>{ left--; $("#tm").style.width=(left/45*100)+"%"; if(left<=0){ clearInterval(timer); submit(); } };
   timer=setInterval(tick,1000);
@@ -785,15 +933,20 @@ function quiz(app){
   $("#sub").onclick=submit;
 }
 
+function caseData(id){
+  const g=S.gen[id];
+  if(g && g.src==="ai") return {who:g.who, cards:g.cards, reveal:g.reveal, lesson:g.lesson||CASES[id].lesson, truth:g.truth, ai:true};
+  return {...CASES[id], who:pick(CASES[id].who)};
+}
 function caseStep(app, st){
-  const C=CASES[st.id]; const rec=S.cases[st.id] || {seen:1};
+  const C=caseData(st.id); const rec=S.cases[st.id] || {seen:1};
   S.cases[st.id]=rec;
   const draw=()=>{
     const cards = C.cards.slice(0,rec.seen).map((c,i)=>`<div class="ev"><i>${i+1}/4</i><span>${esc(c)}</span></div>`).join("");
     const decided = rec.verdict!=null;
     app.innerHTML = `<div class="card">
       <div class="eyebrow">Gate ${gateOf(S.step)} · The Discernment</div>
-      <h2>Judge the integrity of ${T(C.who)}</h2>
+      <h2>Judge the integrity of ${esc(C.who)}</h2>
       <p>Evidence arrives one piece at a time. Judge whenever you’re ready, or keep looking.</p>
       <div class="evid">${cards}</div>
       ${decided ? "" : `
@@ -816,7 +969,7 @@ function caseStep(app, st){
     $("#after").innerHTML = `${remaining?`<p class="note">The evidence you didn’t wait for:</p><div class="evid">${remaining}</div>`:""}
       <div class="truth"><b>What was really going on</b><p>${esc(C.reveal)}</p>
       ${S.exam?"":`<p><b>${right?"You read it right":"You read it wrong"}</b> after ${rec.seen} of 4 pieces of evidence, at ${rec.conf}% confidence. Discernment: ${sc}.</p>`}</div>
-      <p>${S.lens==="f"?esc(C.lesson):esc(C.lesson.replace(/^Job’s three friends[^.]*\. They were wrong, and confident\. /,"Confident judges are often wrong. "))}</p>
+      <p>${C.ai||S.lens==="f"?esc(C.lesson):esc(C.lesson.replace(/^Job’s three friends[^.]*\. They were wrong, and confident\. /,"Confident judges are often wrong. "))}</p>
       <div class="setgroup"><span>The four tells of real integrity</span><div class="tells">
         <div><b>Same in the dark</b>Consistent seen and unseen.</div>
         <div><b>Promises kept</b>Especially when keeping them costs.</div>
@@ -828,7 +981,7 @@ function caseStep(app, st){
   draw();
 }
 function caseScore(id){
-  const C=CASES[id], r=S.cases[id]; if(!r || r.verdict==null) return null;
+  const C=caseData(id), r=S.cases[id]; if(!r || r.verdict==null) return null;
   return r.verdict===C.truth ? Math.round(60+10*r.seen) : Math.round(clamp(40-(r.conf-50)*0.8));
 }
 
@@ -837,7 +990,7 @@ function echo(app){
   app.innerHTML = `<div class="card">
     <div class="eyebrow">An echo from Gate 1</div>
     <h2>It came back</h2>
-    <p class="scene">${esc(S.set==="y" ? "A classmate compared papers and spotted the wrong mark. Now the story isn’t the mark. It’s that you kept it." : "The auditors found the figure in the board report. The question in the room isn’t about the mistake any more. It’s “Who knew?”")}</p>
+    <p class="scene">${esc((S.gen.error && S.gen.error.src==="ai" && S.gen.error.echo) ? S.gen.error.echo : (S.set==="y" ? "A classmate compared papers and spotted the wrong mark. Now the story isn’t the mark. It’s that you kept it." : "The auditors found the figure in the board report. The question in the room isn’t about the mistake any more. It’s “Who knew?”"))}</p>
     <p class="note">Choices ripple. What you leave hidden at one gate tends to meet you at another.</p>
     <div class="row"><button class="btn" id="n">Continue</button></div></div>`;
   $("#n").onclick=next;
@@ -847,17 +1000,18 @@ function road(app){
   app.innerHTML = `<div class="card">
     <div class="eyebrow">Leaving the Vault</div>
     <h2>Two roads</h2>
-    <p class="scene">Two roads lead out of the Vault toward the Summit. <b>The Golden Road</b> is paved and quick, and every traveller on it receives 20 talents. <b>The Market Lane</b> is crowded and slow, and pays nothing.</p>
-    <div class="opts" id="o">
-      <button class="opt" data-v="gold"><span class="k">A</span><span>Take the Golden Road (+20 talents)</span></button>
-      <button class="opt" data-v="market"><span class="k">B</span><span>Take the Market Lane</span></button></div>
+    <p class="scene">Two roads lead out of the Vault toward the Summit. <b>${esc(cap(PV().gold))}</b> is paved and quick, and every traveller on it receives 20 talents. <b>${esc(cap(PV().lane))}</b> is crowded and slow, and pays nothing.</p>
+    <div class="opts" id="o">${(S.roadOrder ?? (S.roadOrder=Math.random()<.5?0:1))===0
+      ? `<button class="opt" data-v="gold"><span class="k">A</span><span>Take ${esc(PV().gold)} (+20 talents)</span></button><button class="opt" data-v="market"><span class="k">B</span><span>Take ${esc(PV().lane)}</span></button>`
+      : `<button class="opt" data-v="market"><span class="k">A</span><span>Take ${esc(PV().lane)}</span></button><button class="opt" data-v="gold"><span class="k">B</span><span>Take ${esc(PV().gold)} (+20 talents)</span></button>`}</div>
     <div id="after"></div></div>`;
   const choose=(v)=>{
     app.querySelectorAll(".opt").forEach(x=>{ x.disabled=true; x.classList.toggle("picked",x.dataset.v===v); });
     if(!S.road){ S.road=v; if(v==="gold") S.tal+=20; save(); rail(); }
     let msg;
-    if(v==="market") msg = S.promise==="no" ? "Halfway down the lane, an old woman is struggling with a basket. It’s Mara. “You came anyway,” she says, and lets you carry it." : "Halfway down the lane, Mara is sitting beside her basket. She looks up. “You remembered.”";
-    else msg = "The Golden Road is smooth and fast. The talents are already in your purse.";
+    const w=PV().who;
+    if(v==="market") msg = S.promise==="no" ? `Halfway along ${PV().lane}, you find ${w}, still waiting. “You came anyway,” ${w} says, and lets you help.` : `Halfway along ${PV().lane}, ${w} is waiting. ${w} looks up. “You remembered.”`;
+    else msg = `${cap(PV().gold)} is smooth and fast. The talents are already in your purse.`;
     $("#after").innerHTML = `<div class="conseq"><p>${esc(msg)}</p><div class="row"><button class="btn" id="n">Continue</button></div></div>`;
     $("#n").onclick=next;
   };
@@ -878,7 +1032,7 @@ function gateEnd(app, st){
   $("#n").onclick=next;
   const d=$("#deep"); if(d) d.onclick=async()=>{
     d.disabled=true; const p=$("#gl"); p.classList.add("loading"); const orig=p.textContent;
-    const log = ids.map(id=>`Scene: ${pick(SCN[id].text).slice(0,180)} → Chose: ${pick(optsOf(id)[S.ans[id]].t)}${S.why[id]?" (reason given: "+S.why[id]+")":""}`).join("\n");
+    const log = ids.map(id=>`Scene: ${sceneText(id).slice(0,220)} → Chose: ${pick(sceneOpt(id,S.ans[id]).t)}${S.why[id]?" (reason given: "+S.why[id]+")":""}`).join("\n");
     try{
       const t = await ai("gate", {gate:GATES[st.g].name, elements:pick(GATES[st.g].els), log:log||"(no scored choices at this gate)"});
       p.classList.remove("loading"); p.textContent=t||orig;
@@ -970,12 +1124,16 @@ function final(app){
   const council=S.mode==="council";
   const who = S.name || (council?"The Council":"Traveller");
   const pdText = R.pd.map(p=>{
-    const nm = p.a==="change" ? "Wrong change with people watching, then the unscanned item alone" : "Credit for Tolu’s idea in front of others, then alone with the slides";
+    const gen = S.gen[p.a] && S.gen[p.a].src==="ai";
+    const nm = p.a==="change"
+      ? (gen ? "Pair 1 (honesty with money): first with people watching, later alone" : "Wrong change with people watching, then the unscanned item alone")
+      : (gen ? "Pair 2 (giving credit where it’s due): first in front of others, later alone" : "Credit for Tolu’s idea in front of others, then alone with the slides");
     return `${nm}: ${p.vs>p.vu?"<b>you did better when watched</b>":(p.vs<p.vu?"you did better alone":"the same person both times")}.`;
   }).join(" ");
   const pl = R.pl.length ? (R.gapAvg>0.5 ? `You rated others’ wrongs ${R.gapAvg.toFixed(1)} points more serious than the same wrongs done by you.` : (R.gapAvg<-0.5 ? `You judged yourself ${Math.abs(R.gapAvg).toFixed(1)} points more harshly than others. Fair, but watch for self-condemnation.` : "You used the same scale for yourself as for others.")) : "";
-  const fidText = {yes:{market:"You promised Mara, and with no reminder you took the Market Lane. Promise kept.",gold:"You promised Mara, then took the Golden Road for 20 talents. She waited."},
-    no:{market:"You honestly declined Mara’s request, and still took the Market Lane. Kindness without obligation.",gold:"You honestly declined, and took the Golden Road. An honest no kept its word."},
+  const P_=PV();
+  const fidText = {yes:{market:`You promised ${P_.who}, and with no reminder you took ${P_.lane}. Promise kept.`,gold:`You promised ${P_.who}, then took ${P_.gold} for 20 talents. ${P_.who} waited.`},
+    no:{market:`You honestly declined ${P_.who}’s request, and still took ${P_.lane}. Kindness without obligation.`,gold:`You honestly declined, and took ${P_.gold}. An honest no kept its word.`},
     maybe:{market:"You said “maybe” and showed up. A soft promise, kept.",gold:"You said “maybe”, and the maybe became a no without a word."}}[S.promise||"no"][S.road||"gold"];
   let coinText="";
   if(R.coins){
@@ -1028,7 +1186,7 @@ function final(app){
     const done=()=>toast("Summary copied");
     try{ navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt)); }catch(e){ fallbackCopy(txt); }
   };
-  $("#again").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} const keep={name:S.name,lens:S.lens,set:S.set,mode:S.mode,exam:S.exam,cohort:S.cohort}; S=Object.assign(FRESH(),keep); S.step=-1; render(); };
+  $("#again").onclick=()=>{ try{localStorage.removeItem(KEY);}catch(e){} const keep={name:S.name,lens:S.lens,set:S.set,mode:S.mode,exam:S.exam,cohort:S.cohort,level:S.level,role:S.role}; S=Object.assign(FRESH(),keep); S.step=-1; render(); };
   $("#trialbtn").onclick=()=>trial(R);
   if(backendReady()) wireDeeper(R);
   writeBook(R);
@@ -1056,7 +1214,10 @@ function runPayload(R, link){
     events:{ans:S.ans, planks:S.planks, self_honest:S.selfHonest, promise:S.promise, road:S.road,
       quiz:S.quiz?{key_early:!!S.quiz.keyEarly, said_used:!!S.quiz.saidUsed, claim:S.quiz.claim, correct:S.quiz.correct}:null,
       cases:Object.fromEntries(Object.entries(S.cases).map(([k,v])=>[k,{seen:v.seen,verdict:v.verdict,conf:v.conf}])),
-      coins:R.coins ? (R.coins.council?{n:R.coins.p,h:R.coins.h,council:true}:{n:R.coins.n,h:R.coins.h}) : null},
+      coins:R.coins ? (R.coins.council?{n:R.coins.p,h:R.coins.h,council:true}:{n:R.coins.n,h:R.coins.h}) : null,
+      level:S.level||1, promise_variant:S.pv||0,
+      generated:Object.fromEntries(Object.entries(S.gen).map(([k,v])=>[k, v.src==="ai"])),
+      case_truth:Object.fromEntries(["femi","bayo"].map(k=>[k, caseData(k).truth]))},
     research_consent:!!S.research, link_consent:!!link
   };
 }
@@ -1135,7 +1296,7 @@ function paintBook(b){
 }
 async function writeBook(R){
   if(S.book){ paintBook(S.book); return; }
-  const log = Object.keys(S.ans).map(id=>`- ${pick(SCN[id].text).slice(0,140)}… → ${pick(optsOf(id)[S.ans[id]].t)}${S.why[id]?" | why: "+S.why[id].slice(0,200):""}`).join("\n");
+  const log = Object.keys(S.ans).map(id=>`- ${sceneText(id).slice(0,160)}… → ${pick(sceneOpt(id,S.ans[id]).t)}${S.why[id]?" | why: "+S.why[id].slice(0,200):""}`).join("\n");
   const data = {name:S.name||"the player", iq:R.iq, rank:pick(R.rank[1]), choices:R.choices, wholeness:R.whole, discernment:R.disc,
     elements:Object.entries(R.els).filter(([,v])=>v!=null).map(([k,v])=>elName(k)+" "+v).join(", "),
     mirrors:`Seen/Unseen ${R.seen}; Say/Do ${R.say} (${R.notes.join(" ")}); Others/Self ${R.plank} (gap ${R.gapAvg.toFixed(1)}); Promise/Path ${R.fid} (promise: ${S.promise}, road: ${S.road})`,

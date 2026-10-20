@@ -1,4 +1,4 @@
-﻿// UNDIVIDED v2 · the only file you edit after deploying.
+// UNDIVIDED v2 · the only file you edit after deploying.
 // The key below is the PUBLIC anon key. Every table is locked; only the ud_* functions can be called.
 window.UNDIVIDED_CONFIG = {
   supabaseUrl: "https://aavwbyrudkqqzjkdlflx.supabase.co",

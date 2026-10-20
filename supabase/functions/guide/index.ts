@@ -15,7 +15,8 @@ const MODEL = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-5-5";
 const KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const SB_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const HOURLY = Number(Deno.env.get("GUIDE_HOURLY_LIMIT") ?? "80");
+// v3 writes ~15 fresh scenes per play, and a whole classroom often shares one IP address.
+const HOURLY = Number(Deno.env.get("GUIDE_HOURLY_LIMIT") ?? "600");
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -41,8 +42,79 @@ const SAFETY = "Never shame the player. Never suggest that suffering is a punish
 
 type Built = { prompt: string; maxTokens: number; asJson: boolean };
 
+// ---------- v3: fresh scenes on fixed blueprints ----------
+function levelRule(d: Record<string, unknown>) {
+  const lv = Number(d.level) || 1;
+  if (lv >= 3) return `DIFFICULTY: SAGE. ${d.role ? `Set the scene inside the player's real life: ${clip(d.role, 120)}.` : "Use a demanding adult leadership context."} Make it morally grey: include one important fact the player cannot verify in time, real time pressure, and competing loyalties. Every option must sound wise and defensible to a thoughtful person; the strongest-integrity option should cost the most and look the least "nice". Never label or moralise an option.`;
+  if (lv === 2) return `DIFFICULTY: STEWARD. Two genuine goods must collide (e.g. loyalty vs honesty, mercy vs justice, family vs fairness). Every option must sound reasonable and be something a decent person might choose. The strongest-integrity option must cost the player something they care about (money, a friendship, reputation, comfort, time). Never label or moralise an option.`;
+  return `DIFFICULTY: SEEKER. Keep the choice clear and the stakes everyday, with a modest real cost to doing right.`;
+}
+function lensRule(lens: string) {
+  return lens === "f" ? "Faith lens: church, prayer or God may appear naturally where it fits, never preachy." : "Civic lens: no religious content at all.";
+}
+function settingRule(setting: string) {
+  return setting === "y" ? "The player is a school student aged 12-18: school, family, friends, teams, online life. Fully age-appropriate: no romance or sexual content, no alcohol, no violence." : "The player is an adult: work, family, community, church or civic life.";
+}
+function optionsSpec(opts: unknown, n: number) {
+  const arr = Array.isArray(opts) ? opts.slice(0, 5) : [];
+  return arr.map((o: any, i: number) => `${i + 1}. MEANING: ${clip(o?.t, 200)}  (what tends to follow: ${clip(o?.c, 200)})`).join("\n");
+}
+function sceneSchema(n: number, extra = "") {
+  return `{"text":"70-120 words, second person, present tense, concrete names and details","options":[{"t":"6-24 words, first person or imperative, no labels","c":"one sentence: what happens next"}]${extra}} with EXACTLY ${n} options in the SAME ORDER as the archetypes`;
+}
+function sceneBrief(d: any, cond = "") {
+  const n = Array.isArray(d?.options) ? Math.min(d.options.length, 5) : 0;
+  return { n, text: `PRINCIPLE TESTED: ${clip(d?.principle, 80)} (gate: ${clip(d?.gate, 40)}).
+STRUCTURAL PATTERN, for structure only. Do NOT reuse its people, objects, place, money or wording: ${clip(d?.pattern, 700)}
+${cond}
+OPTION ARCHETYPES. Write one option per archetype, in this exact order, each carrying exactly the same moral meaning in the new situation:
+${optionsSpec(d?.options, n)}` };
+}
+
 function build(task: string, lens: string, setting: string, mode: string, d: Record<string, unknown>): Built | null {
   const head = `${voice(lens)} ${audience(setting)} ${SAFETY}`;
+  const fresh = (dd: any) => `You are writing a brand-new scenario for the integrity game UNDIVIDED. It must feel like real life and be different from anything the player has seen.
+${settingRule(setting)} ${lensRule(lens)}
+WORLD FOR THIS SCENE: ${clip(dd?.world, 80)}. Use fresh, culturally varied names (for example Nigerian, Mexican, Indian, American, Korean, Irish); never use the names Tolu, Marcus, Grace, David, Kunle, Dayo, Kemi, Bisi, Femi, Bayo, Mara.
+${levelRule(dd)}`;
+  if (task === "scene") {
+    const b = sceneBrief(d);
+    if (b.n < 2) return null;
+    const echo = d.want_echo ? ',"echo":"two sentences, second person: weeks later, how the hidden thing comes to light and what people now ask"' : "";
+    const cascade = d.cascade ? `\nCONTINUITY: ${clip(d.cascade, 300)}` : "";
+    return { asJson: true, maxTokens: 900, prompt: `${fresh(d)}${cascade}
+${b.text}
+Return JSON only, on a single line: ${sceneSchema(b.n, echo)}` };
+  }
+  if (task === "pair") {
+    const s1 = sceneBrief((d as any).seen, "CONDITION: WATCHED. Other people are present and will see exactly what the player does.");
+    const s2 = sceneBrief((d as any).alone, "CONDITION: ALONE. No one is present and no one will ever find out.");
+    if (s1.n < 2 || s2.n < 2) return null;
+    return { asJson: true, maxTokens: 1700, prompt: `${fresh(d)}
+Write TWO scenes that test the same principle under different conditions. They must look unrelated on the surface: different people, place, object and amount, so the player does not notice they are a pair.
+SCENE "seen":
+${s1.text}
+SCENE "alone":
+${s2.text}
+Return JSON only, on a single line: {"seen":${sceneSchema(s1.n)},"alone":${sceneSchema(s2.n)}}` };
+  }
+  if (task === "plank") {
+    return { asJson: true, maxTokens: 500, prompt: `${fresh(d)}
+Write two short items (25-45 words each) describing THE SAME wrongdoing at the same seriousness, in a new situation that does not reuse these patterns' details.
+Pattern A (someone else did it): ${clip(d.pattern_other, 300)}
+Pattern B (the player did it, with a sympathetic reason): ${clip(d.pattern_self, 300)}
+"other" is in third person about a named person; "self" is in second person ("You..."). They should not obviously look like the same story.
+Return JSON only, on a single line: {"other":"...","self":"..."}` };
+  }
+  if (task === "case") {
+    const truth = d.truth === true;
+    return { asJson: true, maxTokens: 900, prompt: `${fresh(d)}
+Write a DISCERNMENT CASE: the player judges a real-seeming person's integrity from evidence revealed one card at a time.
+THE HIDDEN TRUTH: this person ${truth ? "HAS integrity; appearances are against them" : "LACKS integrity; appearances flatter them"}.
+Card 1 and 2 must point convincingly toward the WRONG conclusion. Card 3 is ambiguous. Card 4 is decisive toward the truth.
+Structural pattern only, do not copy: ${clip(d.pattern, 500)}
+Return JSON only, on a single line: {"who":"name and role, e.g. 'Mrs. Adaeze Okafor, the choir treasurer'","cards":["...","...","...","..."],"reveal":"2-3 sentences: what was really going on","lesson":"1-2 sentences on how to judge integrity well${lens === "f" ? " (may mention Job's friends, who judged wrongly)" : ""}"}` };
+  }
   if (task === "ask") {
     const opts = Array.isArray(d.options) ? d.options.slice(0, 5).map((o, i) => `${"ABCDE"[i]}) ${clip(o, 200)}`).join(" | ") : "";
     return { asJson: false, maxTokens: 220, prompt: `${head}

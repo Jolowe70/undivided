@@ -46,3 +46,16 @@ Copy `bridge/undivided-bridge.js` into The Integrity Commons and The Three Fires
 ## Privacy, in one paragraph
 
 Players never sign in and are never asked for an email. Their name stays on their device. Results are stored only if they join a group, tick research consent, or choose to carry their scores to another site. Nothing they write is stored. Leaders see totals only once 5 or more people have played. All tables are locked; the browser can only call the `ud_*` functions. This is a reflection tool, not a validated test: not for hiring, grading, discipline or appointments.
+
+## v3 · Dynamic scenes and levels (upgrade from v2)
+
+Every play is now new. Each of the 13 scenes, the two watched/alone pairs, the two judgment pairs and the two discernment cases are rewritten by the guide around a fixed blueprint (same principle, same moral structure, same scoring). Options are shuffled. The quiz draws 3 of 12 questions with shuffled answers. The promise character and the two roads change. The truth in each discernment case (innocent or guilty) is random.
+
+Levels: 1 Seeker (clear), 2 Steward (two goods collide; every option sounds reasonable; doing right costs something; asking the guide costs 10 talents, players start with 30), 3 Sage (scenes written for the player's real role; grey areas; Examiner mode on).
+
+Upgrade steps:
+1. Supabase SQL Editor → run `undivided-v3-migration.sql` (once).
+2. Redeploy the `guide` function with the new `supabase/functions/guide/index.ts` (dashboard: open guide → paste → Deploy; or `npx supabase functions deploy guide --no-verify-jwt --project-ref aavwbyrudkqqzjkdlflx`). Keep Verify JWT OFF.
+3. Copy the files into C:\dev\undivided, then `git add -A`, `git commit`, `git push`.
+
+If the guide can't be reached, the classic scenes are used (still shuffled), so the game never breaks.
