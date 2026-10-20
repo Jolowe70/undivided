@@ -1236,13 +1236,22 @@ async function ensureLink(R){
 function deeperPanel(R){
   const f=fireFor(R);
   return `<div class="conseq" id="deeper">
-    <b>Go deeper</b>
-    <p>Your clearest growing edge looks most like the way of <b>${esc(f.name)}</b> in Jude 1:11: ${esc(f.desc)}. <span class="note">(A rough mapping, not a diagnosis.)</span></p>
-    <div class="row">
-      <a class="btn" id="lk-ic" href="${esc(CFG.commonsUrl||"#")}" target="_blank" rel="noopener">Take the full Integrity Profile</a>
-      <a class="btn ghost" id="lk-tf" href="${esc(CFG.threeFiresUrl||"#")}" target="_blank" rel="noopener">Explore The Three Fires</a>
+    <b>Your next 100 days</b>
+    <div class="tells">
+      <div><b>Days 1–7 · Practise</b>Live the three missions above. Your Book of Your Life is your guide.</div>
+      <div><b>Day 8 · Profile</b>Take the free Diligence Profile (15 minutes). It finds your rate-limiting factor and compares it with today’s result.</div>
+      <div><b>Days 8–97 · Pathway</b>The Diligence 90-day journey: one challenge a day, built on what both tools found.</div>
+      <div><b>Day 100 · Proof</b>Play Undivided again. New scenes, same mirrors. See whether your line has straightened.</div>
     </div>
-    <label class="row" style="gap:8px;font-size:15px;align-items:flex-start"><input type="checkbox" id="carry" ${S.run&&S.run.link_code?"checked":""} style="margin-top:5px"> <span>Carry my scores with me (scores only, never what I wrote). The link code expires in 30 days.</span></label>
+    <div class="row">
+      <a class="btn brass" id="lk-dp" href="${esc(CFG.diligenceUrl||"#")}" target="_blank" rel="noopener">Start the Diligence Profile</a>
+    </div>
+    <p>Side routes: your clearest growing edge looks most like the way of <b>${esc(f.name)}</b> in Jude 1:11: ${esc(f.desc)}. <span class="note">(A rough mapping, not a diagnosis.)</span></p>
+    <div class="row">
+      <a class="btn ghost" id="lk-ic" href="${esc(CFG.commonsUrl||"#")}" target="_blank" rel="noopener">The full Integrity Profile (IPI)</a>
+      <a class="btn ghost" id="lk-tf" href="${esc(CFG.threeFiresUrl||"#")}" target="_blank" rel="noopener">The Three Fires</a>
+    </div>
+    <label class="row" style="gap:8px;font-size:15px;align-items:flex-start"><input type="checkbox" id="carry" ${S.run&&S.run.link_code?"checked":""} style="margin-top:5px"> <span>Carry my scores with me to these sites (scores only, never what I wrote). The link code lasts 120 days, long enough for the whole journey.</span></label>
     <p class="note" id="savemsg"></p>
   </div>`;
 }
@@ -1250,8 +1259,8 @@ function wireDeeper(R){
   const msg=$("#savemsg");
   const setLinks=(code)=>{
     const add=(u)=> u ? u + (u.includes("?")?"&":"?") + "ud=" + encodeURIComponent(code) : "#";
-    if(code){ $("#lk-ic").href=add(CFG.commonsUrl); $("#lk-tf").href=add(CFG.threeFiresUrl); msg.textContent=`Your link code is ${code}. Both buttons now carry it.`; }
-    else { $("#lk-ic").href=CFG.commonsUrl||"#"; $("#lk-tf").href=CFG.threeFiresUrl||"#"; }
+    if(code){ $("#lk-dp").href=add(CFG.diligenceUrl); $("#lk-ic").href=add(CFG.commonsUrl); $("#lk-tf").href=add(CFG.threeFiresUrl); msg.textContent=`Your link code is ${code}. All three buttons now carry it. Write it down for Day 100.`; }
+    else { $("#lk-dp").href=CFG.diligenceUrl||"#"; $("#lk-ic").href=CFG.commonsUrl||"#"; $("#lk-tf").href=CFG.threeFiresUrl||"#"; }
   };
   if(S.run && S.run.link_code) setLinks(S.run.link_code);
   else if((S.cohort||S.research) && !S.run){

@@ -9,7 +9,8 @@
 //   5. Later, with the player's consent, attachToUndivided() sends back TOTALS from your instrument
 //      (e.g. IPI domain scores or the FIRE Index), so behaviour (game) and self-report (IPI) can be compared.
 //
-// Codes expire 30 days after the player creates them.
+// Codes last 120 days after the player creates them (the length of the 100-Day journey plus margin).
+// source names: "integrity-commons", "three-fires", "diligence-profile".
 
 const UD = {
   supabaseUrl: "https://YOUR-PROJECT-REF.supabase.co",   // same values as the game's config.js

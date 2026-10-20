@@ -54,8 +54,11 @@ Every play is now new. Each of the 13 scenes, the two watched/alone pairs, the t
 Levels: 1 Seeker (clear), 2 Steward (two goods collide; every option sounds reasonable; doing right costs something; asking the guide costs 10 talents, players start with 30), 3 Sage (scenes written for the player's real role; grey areas; Examiner mode on).
 
 Upgrade steps:
-1. Supabase SQL Editor → run `undivided-v3-migration.sql` (once).
+1. Supabase SQL Editor → run `undivided-v3-migration.sql`, then `undivided-v3b-diligence-migration.sql` (once each, in that order).
 2. Redeploy the `guide` function with the new `supabase/functions/guide/index.ts` (dashboard: open guide → paste → Deploy; or `npx supabase functions deploy guide --no-verify-jwt --project-ref aavwbyrudkqqzjkdlflx`). Keep Verify JWT OFF.
 3. Copy the files into C:\dev\undivided, then `git add -A`, `git commit`, `git push`.
 
 If the guide can't be reached, the classic scenes are used (still shuffled), so the game never breaks.
+
+## v3b · The Diligence link (the 100-Day Plumb Line)
+Results now end with "Your next 100 days": Days 1–7 practise, Day 8 the Diligence Profile, Days 8–97 the 90-day journey, Day 100 replay Undivided. Link codes last 120 days. The Diligence site's side of the link is in its own update zip (undivided-link.js).
